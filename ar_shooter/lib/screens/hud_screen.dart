@@ -6,8 +6,10 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 import '../data/teams.dart';
 import '../models/hit_event.dart';
+import '../models/match_state.dart';
 import '../services/detection_service.dart';
 import '../services/hit_resolver.dart';
 import '../services/lan.dart';
@@ -75,6 +77,14 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
   bool _showDamageBlood = false;
   String? _floatingDamageText;
 
+  // Phase 3: Gyro Sway, Grenade, Bomb
+  double _swayX = 0.0;
+  double _swayY = 0.0;
+  StreamSubscription? _gyroSub;
+  int? _grenadeFuseTimer;
+  Timer? _grenadeTimer;
+  Timer? _bombBeepTimer;
+
   @override
   void initState() {
     super.initState();
@@ -89,6 +99,23 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
       _takeDamage(dmg);
       _toast('$shooter sizga $dmg zarar yetkazdi ($conf)!');
     };
+
+    try {
+      _gyroSub = gyroscopeEventStream().listen((e) {
+        if (!mounted) return;
+        setState(() {
+          _swayX = (_swayX * 0.75 + e.y * 3.0).clamp(-18.0, 18.0);
+          _swayY = (_swayY * 0.75 + e.x * 2.0).clamp(-12.0, 12.0);
+        });
+      });
+    } catch (_) {}
+
+    _bombBeepTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      final bomb = lan.bombState.value;
+      if (bomb != null && bomb.status == BombStatus.armed && s.soundEnabled) {
+        _playSound('audio/bomb_beep.wav');
+      }
+    });
 
     _roundTickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
@@ -429,6 +456,8 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
   }
 
   void _pickup() {
+    _playSound('audio/pickup.wav');
+    _triggerHaptic(isHit: true);
     if (_kind == Kind.medkit) {
       s.addMedkit();
       _toast('+1 Aptechka olindi');
@@ -462,6 +491,66 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
     }
   }
 
+  void _throwGrenade() {
+    if (_grenadeFuseTimer != null) {
+      _toast('Granata allaqachon otilgan!');
+      return;
+    }
+    if (!s.useGrenade()) {
+      _toast('Granata qolmadi! (Sovg\'a qutisidan oling)');
+      return;
+    }
+
+    setState(() => _grenadeFuseTimer = 3);
+    _triggerHaptic();
+
+    _grenadeTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      setState(() {
+        _grenadeFuseTimer = (_grenadeFuseTimer! - 1);
+      });
+
+      if (_grenadeFuseTimer! <= 0) {
+        t.cancel();
+        _detonateGrenade();
+      }
+    });
+  }
+
+  void _detonateGrenade() {
+    _playSound('audio/grenade.wav');
+    _triggerHaptic(isKill: true);
+
+    setState(() {
+      _grenadeFuseTimer = null;
+      _showDamageBlood = true;
+    });
+
+    Timer(const Duration(milliseconds: 300), () {
+      if (mounted) setState(() => _showDamageBlood = false);
+    });
+
+    // Area damage to active enemy in blast radius
+    if (_kind == Kind.enemy) {
+      const blastDmg = 85;
+      setState(() {
+        _enemyHp -= blastDmg;
+        _showHitmarker = true;
+        _floatingDamageText = 'BLAST -$blastDmg';
+      });
+
+      if (_enemyHp <= 0) {
+        s.addKill();
+        lan.reportKill('GRANATA ZARBASI');
+        setState(() => _kind = null);
+        _toast('Granata bilan dushman yo\'q qilindi! +15 XP');
+      }
+    }
+  }
+
   void _toast(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -483,6 +572,9 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
     _attackTimer?.cancel();
     _roundTickTimer?.cancel();
     _reloadTimer?.cancel();
+    _grenadeTimer?.cancel();
+    _gyroSub?.cancel();
+    _bombBeepTimer?.cancel();
     SensorsService.i.stopTracking();
     lan.onDamageReceived = null;
     _cam?.stopImageStream().catchError((_) {});
@@ -542,6 +634,19 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
                 height: _targetRect.height,
                 child: _buildTargetWidget(),
               ),
+
+            // Bomb Mode tactical banner
+            _buildBombModeOverlay(size),
+
+            // Weapon In Hand with idle gyroscope sway
+            Positioned(
+              bottom: 125,
+              right: 18,
+              child: Transform.translate(
+                offset: Offset(_swayX, _swayY) + _recoilOffset,
+                child: _buildWeaponInHandOverlay(),
+              ),
+            ),
 
             // Center Crosshair HUD with recoil
             Transform.translate(
@@ -850,6 +955,155 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
     );
   }
 
+  Widget _buildBombModeOverlay(Size size) {
+    final bomb = lan.bombState.value;
+    if (bomb == null || !bomb.isActive) return const SizedBox.shrink();
+
+    final dist = HitResolver.calculateDistanceMeters(
+      SensorsService.i.latitude,
+      SensorsService.i.longitude,
+      bomb.latitude,
+      bomb.longitude,
+    );
+    final inRange = dist <= 5.0;
+
+    return Positioned(
+      top: 110,
+      left: 20,
+      right: 20,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: kCard.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: bomb.status == BombStatus.armed ? kRed : kOrange,
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: (bomb.status == BombStatus.armed ? kRed : kOrange).withValues(alpha: 0.4),
+              blurRadius: 16,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  bomb.status == BombStatus.armed ? Icons.warning_rounded : Icons.crisis_alert,
+                  color: bomb.status == BombStatus.armed ? kRed : kOrange,
+                  size: 22,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    bomb.status.label,
+                    style: TextStyle(
+                      color: bomb.status == BombStatus.armed ? kRed : kOrange,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${dist.toStringAsFixed(1)}m',
+                  style: GoogleFonts.robotoMono(
+                    color: inRange ? kGreen : Colors.white70,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+            if (bomb.status == BombStatus.armed) ...[
+              const SizedBox(height: 6),
+              Text(
+                'PORTLASHGA QOLDI: ${bomb.explodeCountdownSec}s',
+                style: GoogleFonts.robotoMono(color: kRed, fontWeight: FontWeight.w900, fontSize: 16),
+              ),
+            ],
+            if (inRange) ...[
+              const SizedBox(height: 8),
+              if (bomb.status == BombStatus.arming)
+                FilledButton.icon(
+                  onPressed: () => lan.interactWithBomb(action: 'arm'),
+                  icon: const Icon(Icons.touch_app, size: 16),
+                  label: Text('BOMBANI FAOLLASHTIRISH (${bomb.armTimerSec}s)'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: kOrange,
+                    foregroundColor: Colors.black,
+                  ),
+                )
+              else if (bomb.status == BombStatus.armed || bomb.status == BombStatus.defusing)
+                FilledButton.icon(
+                  onPressed: () => lan.interactWithBomb(action: 'defuse'),
+                  icon: const Icon(Icons.shield, size: 16),
+                  label: Text('ZARARSIZLANTIRISH (${bomb.defuseTimerSec}s)'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: kCyan,
+                    foregroundColor: Colors.black,
+                  ),
+                ),
+            ] else ...[
+              const SizedBox(height: 4),
+              const Text(
+                'Amal bajarish uchun bombaga 5 metrdan yaqinroq boring',
+                style: TextStyle(color: Colors.white60, fontSize: 10),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWeaponInHandOverlay() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: kCard.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: s.weapon.rarity.color.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 8),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(s.weapon.icon, color: s.weapon.color, size: 22),
+          const SizedBox(width: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                s.weapon.name,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.white),
+              ),
+              Row(
+                children: [
+                  Text(
+                    s.weapon.fireMode.label,
+                    style: TextStyle(color: s.weapon.color, fontSize: 9, fontWeight: FontWeight.bold),
+                  ),
+                  const Text(' • ', style: TextStyle(color: Colors.white38, fontSize: 9)),
+                  Text(
+                    '${s.weapon.range.toInt()}m',
+                    style: const TextStyle(color: Colors.white60, fontSize: 9),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTopBar() {
     Color statusDotColor;
     switch (lan.status.value) {
@@ -915,6 +1169,33 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
                   color: kOrange,
                   fontWeight: FontWeight.bold,
                   fontSize: 11,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          if (lan.isHost && (lan.bombState.value == null || !lan.bombState.value!.isActive)) ...[
+            InkWell(
+              onTap: () {
+                lan.plantBomb(
+                  lat: SensorsService.i.latitude,
+                  lon: SensorsService.i.longitude,
+                );
+                _toast('Bomba o\'rnatildi! Hujumchilar uni arm qilishi lozim.');
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: kRed.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: kRed),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.crisis_alert, size: 12, color: kRed),
+                    SizedBox(width: 4),
+                    Text('BOMBA', style: TextStyle(fontSize: 10, color: kRed, fontWeight: FontWeight.bold)),
+                  ],
                 ),
               ),
             ),
@@ -1081,6 +1362,31 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
               style: GoogleFonts.robotoMono(
                 color: _scopeZoom > 1.0 ? kCyan : Colors.white70,
                 fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Grenade Button
+          OutlinedButton(
+            onPressed: _throwGrenade,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(54, 54),
+              shape: const CircleBorder(),
+              side: BorderSide(
+                color: _grenadeFuseTimer != null ? kRed : Colors.white24,
+                width: _grenadeFuseTimer != null ? 2 : 1,
+              ),
+              backgroundColor: _grenadeFuseTimer != null
+                  ? kRed.withValues(alpha: 0.2)
+                  : Colors.transparent,
+            ),
+            child: Text(
+              _grenadeFuseTimer != null ? '${_grenadeFuseTimer}s' : '💣${s.grenades}',
+              style: GoogleFonts.robotoMono(
+                color: _grenadeFuseTimer != null ? kRed : Colors.white,
+                fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),
             ),

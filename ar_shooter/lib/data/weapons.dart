@@ -11,6 +11,15 @@ enum Rarity {
   const Rarity(this.label, this.color);
 }
 
+enum FireMode {
+  semi('SEMI'),
+  burst('BURST'),
+  auto('AUTO');
+
+  final String label;
+  const FireMode(this.label);
+}
+
 class Weapon {
   final String id;
   final String name;
@@ -21,7 +30,10 @@ class Weapon {
   final Color color;
   final int fireRateMs;
   final bool isAuto;
+  final FireMode fireMode;
   final double recoil;
+  final double spread;
+  final double range; // in meters
   final int reloadMs;
   final String soundAsset;
   final Rarity rarity;
@@ -36,7 +48,10 @@ class Weapon {
     required this.color,
     required this.fireRateMs,
     required this.isAuto,
+    required this.fireMode,
     required this.recoil,
+    required this.spread,
+    required this.range,
     required this.reloadMs,
     required this.soundAsset,
     required this.rarity,
@@ -52,9 +67,12 @@ const kWeapons = [
     price: 0,
     icon: Icons.gps_fixed,
     color: Colors.grey,
-    fireRateMs: 400,
+    fireRateMs: 380,
     isAuto: false,
+    fireMode: FireMode.semi,
     recoil: 4.0,
+    spread: 2.2,
+    range: 35.0,
     reloadMs: 1400,
     soundAsset: 'audio/pistol.wav',
     rarity: Rarity.common,
@@ -69,22 +87,28 @@ const kWeapons = [
     color: Colors.cyan,
     fireRateMs: 130,
     isAuto: true,
-    recoil: 6.0,
-    reloadMs: 2000,
+    fireMode: FireMode.auto,
+    recoil: 5.5,
+    spread: 3.2,
+    range: 50.0,
+    reloadMs: 1900,
     soundAsset: 'audio/smg.wav',
     rarity: Rarity.rare,
   ),
   Weapon(
     id: 'ar',
     name: 'M416 Rifle',
-    dmg: 26,
+    dmg: 28,
     mag: 30,
     price: 800,
     icon: Icons.local_fire_department,
     color: Colors.orange,
     fireRateMs: 160,
     isAuto: true,
-    recoil: 8.5,
+    fireMode: FireMode.auto,
+    recoil: 7.5,
+    spread: 1.8,
+    range: 85.0,
     reloadMs: 2200,
     soundAsset: 'audio/ar.wav',
     rarity: Rarity.epic,
@@ -99,7 +123,10 @@ const kWeapons = [
     color: Colors.redAccent,
     fireRateMs: 700,
     isAuto: false,
+    fireMode: FireMode.semi,
     recoil: 14.0,
+    spread: 7.5,
+    range: 25.0,
     reloadMs: 2800,
     soundAsset: 'audio/shotgun.wav',
     rarity: Rarity.epic,
@@ -114,7 +141,10 @@ const kWeapons = [
     color: Colors.amber,
     fireRateMs: 1300,
     isAuto: false,
+    fireMode: FireMode.semi,
     recoil: 22.0,
+    spread: 0.4,
+    range: 200.0,
     reloadMs: 3400,
     soundAsset: 'audio/sniper.wav',
     rarity: Rarity.legendary,

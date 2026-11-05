@@ -11,6 +11,9 @@ Barcha qurol va interfeys ovozlari matematik chastota sintezi (sinus/oq shovqin 
 - `ar.wav` — Taktik avtomat o'q ovozi (CC0 1.0 Universal)
 - `shotgun.wav` — Og'ir sochma miltiq zarbasi (CC0 1.0 Universal)
 - `sniper.wav` — Kuchli snayper patroni sadosi (CC0 1.0 Universal)
+- `grenade.wav` — Granata portlashi va to'lqin sadosi (CC0 1.0 Universal)
+- `bomb_beep.wav` — Taktik bomba o'rnatish va zararsizlantirish signali (CC0 1.0 Universal)
+- `pickup.wav` — Aptechka, o'q-dori va sovg'a qutisini olish chimes ovozi (CC0 1.0 Universal)
 - `hit.wav` — Nishonga tekkanda hitmarker signali (CC0 1.0 Universal)
 - `reload.wav` — O'qlash mexanizmi klik ovozi (CC0 1.0 Universal)
 

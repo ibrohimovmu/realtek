@@ -84,11 +84,41 @@
    - `flutter analyze`: 0 xato, 0 ogohlantirish (`No issues found!`).
    - `flutter test`: Barcha 12 ta unit test (`hit_resolver_test`, `lan_test`, `pose_test`, `widget_test`) to'liq o'tdi.
 
+## 📌 PHASE 3: Qurollar, Tovushlar, Bombalar va O'ljalar (Yakunlandi)
+
+### ✅ Amalga oshirilgan ishlar (Done):
+1. **Qurollar va Jangovar Parametrlar (`lib/data/weapons.dart`):**
+   - Har bir qurol uchun alohida parametrlar: zarar (`dmg`), sig'im (`mag`), o't ochish rejimi (`auto`/`semi`/`burst`), maksimal masofa (`range`), krossxeyr sochilish burchagi (`spread`), tepish kuchi (`recoil`), o'qlash vaqti (`reloadMs`) va kamyoblik (`rarity`).
+   - P92 Pistol (35m), UMP45 SMG (50m), M416 Rifle (85m), S12K Shotgun (25m), AWM Sniper (200m).
+2. **Giroskopik Tebranish va Qo'ldagi Qurol Qatlami (`Weapon In Hand Overlay`):**
+   - Giroskop va akselerometr harakati orqali qurol ekranning pastki o'ng burchagida silliq harakatlanadi (`_swayX`, `_swayY`).
+   - Qurol nomi, uning o't ochish rejimi (`AUTO`/`SEMI`), masofasi va kamyoblik rangi dinamik aks etadi.
+3. **Yangi Procedural CC0 Ovozlar:**
+   - `grenade.wav`: Granata portlashi va to'lqin zarbasi ovozi.
+   - `bomb_beep.wav`: Taktik bomba o'rnatish/zararsizlantirish va portlash oldi signali.
+   - `pickup.wav`: O'ljalarni (aptechka, bog'lam, sovg'a qutisi) olgandagi jiringlagan signal.
+4. **Granata Mexanikasi (Grenade System):**
+   - Pastki boshqaruv panelida granatalar soni (`💣2`) va otish tugmasi.
+   - Otilganda 3 soniyalik soat taymeri ishga tushadi (`3s... 2s... 1s...`).
+   - Portlaganda `audio/grenade.wav` chalib, ekran silkinadi va 15 metr radiusdagi barcha dushmanlarga 85 birlik maydon zarari (area blast damage) yetkazadi. Do'stona zarbadan himoyalangan.
+5. **Bomba Rejimi (Host-Controlled Bomb Mode):**
+   - Xost o'yin davomida yuqori paneldagi `BOMBA` tugmasi orqali o'zining turgan GPS nuqtasiga bomba joylashtiradi (`bomb_plant`).
+   - Holat LAN orqali barchaga sinxronlanadi (`BombStatus`: `arming`, `armed`, `defusing`, `defused`, `exploded`).
+   - Bombaga 5 metrdan yaqin bo'lgan o'yinchilarga ekranda interaktiv amal tugmasi chiqadi:
+     - Hujumchilar: 10 soniya davomida turib bombani qurollantiradi (`ARM`).
+     - Himoyachilar: 10 soniya davomida turib bombani zararsizlantiradi (`DEFUSE`).
+   - Bomba qurollanganda 45 soniyalik portlash taymeri boshlanadi va har 2 soniyada taktik signal beradi (`bomb_beep.wav`).
+6. **O'ljalar va Kamyoblik (Loot System):**
+   - Aptechka (+60 HP), Bog'lam (+25 HP), Zirh (60% zararni yutadi), Sovg'a qutilari kamyoblik bo'yicha tortilgan (common 50%, rare 30%, epic 15%, legendary 5%).
+7. **Sifat nazorati va Testlar:**
+   - `flutter analyze`: 0 xato, 0 ogohlantirish (`No issues found!`).
+   - `flutter test`: Barcha 15 ta unit test 100% muvaffaqiyatli o'tdi.
+
 ### 🔄 Jarayondagi ishlar (In Progress):
-- PHASE 3 kutmoqda: Qurollar arsenali, audio effektlar, bombalar, granata va o'ljalar (loot).
+- PHASE 4 kutmoqda: Ro'yxatdan o'tish, profil, yutuqlar (badges), darajalar va JSON export/import.
 
 ### ⚠️ Ma'lum cheklovlar (Known Limits):
-- Xona ichida devorlar orqali GPS signali tushib ketganida zaxira tana rangi va krossxeyr odam ramkasi zarbani to'liq ta'minlaydi.
+- Giroskop bo'lmagan arzon qurilmalarda qurolning silkinishi akselerometr bilan zaxiralangan.
 
 ---
 
@@ -96,7 +126,7 @@
 - [x] PHASE 0: Setup, permissions, first APK
 - [x] PHASE 1: Real person detection + scope
 - [x] PHASE 2: Combined hit resolution (person + team color + GPS/compass)
-- [ ] PHASE 3: Weapons, sound, bombs, loot
+- [x] PHASE 3: Weapons, sound, bombs, loot
 - [ ] PHASE 4: Registration, profile, progression
 - [ ] PHASE 5: Rock-solid local multiplayer (WiFi LAN / hotspot)
 - [ ] PHASE 6: Polish pass 1

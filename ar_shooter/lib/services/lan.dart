@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../models/hit_event.dart';
+import '../models/match_state.dart';
 import 'hit_resolver.dart';
 import 'store.dart';
 
@@ -59,6 +60,7 @@ class Lan {
   final discoveredRooms = ValueNotifier<List<RoomBeacon>>([]);
   final killFeed = ValueNotifier<List<String>>([]);
   final matchRound = ValueNotifier<MatchRound?>(null);
+  final bombState = ValueNotifier<BombState?>(null);
   Function(int damage, String shooterName, String conf)? onDamageReceived;
   final Map<String, int> _lastPlayerShotTs = {};
 
@@ -67,6 +69,7 @@ class Lan {
   final Map<Socket, DateTime> _clientHeartbeats = {};
   Timer? _hostBeaconTimer;
   Timer? _hostHeartbeatCheckTimer;
+  Timer? _hostBombTimer;
   RawDatagramSocket? _hostUdpSocket;
 
   // Client state
@@ -257,6 +260,11 @@ class Lan {
       return;
     }
 
+    if (type == 'bomb_action') {
+      _handleHostBombAction(m['action']?.toString() ?? '', m['player']?.toString() ?? '');
+      return;
+    }
+
     if (type == 'join') {
       String playerName = m['n']?.toString() ?? 'Player';
       playerName = ensureUniquePlayerName(playerName, players.value.keys);
@@ -324,6 +332,119 @@ class Lan {
       _processHitOnHost(hit);
     } else if (_up != null) {
       _up!.write('${jsonEncode(hit.toJson())}\n');
+    }
+  }
+
+  void plantBomb({required double lat, required double lon}) {
+    if (!isHost) return;
+    _hostBombTimer?.cancel();
+    final state = BombState(
+      latitude: lat,
+      longitude: lon,
+      status: BombStatus.arming,
+      armTimerSec: 10,
+      defuseTimerSec: 10,
+      explodeCountdownSec: 45,
+      plantedBy: Store.i.name,
+    );
+    bombState.value = state;
+    _broadcastMessage(state.toJson());
+
+    _hostBombTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      final cur = bombState.value;
+      if (cur == null || !isHost) {
+        t.cancel();
+        return;
+      }
+
+      if (cur.status == BombStatus.armed) {
+        final exp = cur.explodeCountdownSec - 1;
+        if (exp <= 0) {
+          final expState = BombState(
+            latitude: cur.latitude,
+            longitude: cur.longitude,
+            status: BombStatus.exploded,
+            plantedBy: cur.plantedBy,
+          );
+          bombState.value = expState;
+          _broadcastMessage(expState.toJson());
+          t.cancel();
+        } else {
+          final nextState = BombState(
+            latitude: cur.latitude,
+            longitude: cur.longitude,
+            status: BombStatus.armed,
+            explodeCountdownSec: exp,
+            plantedBy: cur.plantedBy,
+          );
+          bombState.value = nextState;
+          _broadcastMessage(nextState.toJson());
+        }
+      }
+    });
+  }
+
+  void interactWithBomb({required String action}) {
+    if (isHost) {
+      _handleHostBombAction(action, Store.i.name);
+    } else if (_up != null) {
+      _up!.write('${jsonEncode({'type': 'bomb_action', 'action': action, 'player': Store.i.name})}\n');
+    }
+  }
+
+  void _handleHostBombAction(String action, String player) {
+    final cur = bombState.value;
+    if (cur == null) return;
+
+    if (action == 'arm' && cur.status == BombStatus.arming) {
+      final nextArm = cur.armTimerSec - 1;
+      if (nextArm <= 0) {
+        final armedState = BombState(
+          latitude: cur.latitude,
+          longitude: cur.longitude,
+          status: BombStatus.armed,
+          explodeCountdownSec: 45,
+          plantedBy: player,
+        );
+        bombState.value = armedState;
+        _broadcastMessage(armedState.toJson());
+      } else {
+        final nextState = BombState(
+          latitude: cur.latitude,
+          longitude: cur.longitude,
+          status: BombStatus.arming,
+          armTimerSec: nextArm,
+          plantedBy: cur.plantedBy,
+        );
+        bombState.value = nextState;
+        _broadcastMessage(nextState.toJson());
+      }
+    } else if (action == 'defuse' &&
+        (cur.status == BombStatus.armed || cur.status == BombStatus.defusing)) {
+      final nextDef = cur.defuseTimerSec - 1;
+      if (nextDef <= 0) {
+        _hostBombTimer?.cancel();
+        final defusedState = BombState(
+          latitude: cur.latitude,
+          longitude: cur.longitude,
+          status: BombStatus.defused,
+          defusedBy: player,
+        );
+        bombState.value = defusedState;
+        _broadcastMessage(defusedState.toJson());
+      } else {
+        final nextState = BombState(
+          latitude: cur.latitude,
+          longitude: cur.longitude,
+          status: BombStatus.defusing,
+          defuseTimerSec: nextDef,
+          explodeCountdownSec: cur.explodeCountdownSec,
+          plantedBy: cur.plantedBy,
+          defusedBy: player,
+        );
+        bombState.value = nextState;
+        _broadcastMessage(nextState.toJson());
+      }
     }
   }
 
@@ -395,6 +516,13 @@ class Lan {
       if (victim == Store.i.name) {
         onDamageReceived?.call(dmg, shooter, conf);
       }
+      return;
+    }
+
+    if (type == 'bomb_sync') {
+      try {
+        bombState.value = BombState.fromJson(Map<String, dynamic>.from(m));
+      } catch (_) {}
       return;
     }
 
@@ -507,6 +635,7 @@ class Lan {
     }
     _hostBeaconTimer?.cancel();
     _hostHeartbeatCheckTimer?.cancel();
+    _hostBombTimer?.cancel();
     _clientPingTimer?.cancel();
     _clientTimeoutTimer?.cancel();
 

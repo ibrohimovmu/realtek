@@ -20,6 +20,7 @@ class Store extends ChangeNotifier {
   int deaths = 0;
   int medkits = 1;
   int bandages = 2;
+  int grenades = 2;
   int armor = 50; // 0 to 100%
   List<String> owned = ['pistol'];
 
@@ -55,6 +56,7 @@ class Store extends ChangeNotifier {
     deaths = _p.getInt('deaths') ?? 0;
     medkits = _p.getInt('med') ?? 1;
     bandages = _p.getInt('bandages') ?? 2;
+    grenades = _p.getInt('grenades') ?? 2;
     armor = _p.getInt('armor') ?? 50;
     owned = _p.getStringList('owned') ?? ['pistol'];
 
@@ -81,6 +83,7 @@ class Store extends ChangeNotifier {
     _p.setInt('deaths', deaths);
     _p.setInt('med', medkits);
     _p.setInt('bandages', bandages);
+    _p.setInt('grenades', grenades);
     _p.setInt('armor', armor);
     _p.setStringList('owned', owned);
 
@@ -202,6 +205,18 @@ class Store extends ChangeNotifier {
       return remaining;
     }
     return dmg;
+  }
+
+  bool useGrenade() {
+    if (grenades <= 0) return false;
+    grenades--;
+    save();
+    return true;
+  }
+
+  void addGrenades(int count) {
+    grenades += count;
+    save();
   }
 
   bool buy(Weapon w) {
