@@ -26,6 +26,7 @@ class Store extends ChangeNotifier {
   bool soundEnabled = true;
   bool vibrationEnabled = true;
   double sensitivity = 1.0;
+  bool safetyAccepted = false;
 
   // Daily Streak
   int dailyStreak = 1;
@@ -57,6 +58,7 @@ class Store extends ChangeNotifier {
     soundEnabled = _p.getBool('sound') ?? true;
     vibrationEnabled = _p.getBool('vibe') ?? true;
     sensitivity = _p.getDouble('sens') ?? 1.0;
+    safetyAccepted = _p.getBool('safety_accepted') ?? false;
 
     dailyStreak = _p.getInt('daily_streak') ?? 1;
     lastDailyEpoch = _p.getInt('last_daily') ?? 0;
@@ -94,6 +96,12 @@ class Store extends ChangeNotifier {
   void setName(String n) {
     name = n;
     save();
+  }
+
+  void acceptSafety() {
+    safetyAccepted = true;
+    _p.setBool('safety_accepted', true);
+    notifyListeners();
   }
 
   void addKill() {
