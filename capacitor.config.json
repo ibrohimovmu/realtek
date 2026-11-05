@@ -1,0 +1,19 @@
+{
+  "appId": "com.realstrike.ar",
+  "appName": "RealStrike AR",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true,
+    "backgroundColor": "#0d0f12"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "backgroundColor": "#0d0f12",
+      "showSpinner": false
+    }
+  }
+}

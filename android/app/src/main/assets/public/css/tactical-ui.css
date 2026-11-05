@@ -1,0 +1,986 @@
+/**
+ * RealStrike AR - Tactical Military HUD & Niagara Minimalism Stylesheet
+ * Strict matte palette: #0d0f12, #141820, #1c222d, accents #ff9800, #00e5ff, #ff1744
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+:root {
+  --bg-dark: #0d0f12;
+  --bg-panel: #141820;
+  --bg-surface: #1a202c;
+  --border-dim: #222b38;
+  --border-bright: #374354;
+  --accent-orange: #ff9800;
+  --accent-orange-dim: rgba(255, 152, 0, 0.15);
+  --accent-cyan: #00e5ff;
+  --accent-red: #ff1744;
+  --text-main: #e2e8f0;
+  --text-dim: #718096;
+  --font-tactical: 'Rajdhani', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  font-family: var(--font-tactical);
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  touch-action: manipulation;
+}
+
+/* Master Tactical Shell Layout */
+#app-root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: radial-gradient(circle at 50% 30%, #151a24 0%, #0d0f12 85%);
+}
+
+/* Top Tactical Bar (Clock, Status, Operator Auth) */
+#top-tactical-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 16px;
+  background: rgba(13, 15, 18, 0.95);
+  border-bottom: 1px solid var(--border-dim);
+  z-index: 100;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.tac-bar-left, .tac-bar-right, .tac-bar-center {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tac-time-pill {
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tac-dot-active {
+  width: 6px;
+  height: 6px;
+  background-color: var(--accent-orange);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--accent-orange);
+}
+
+.tac-cr-tag {
+  color: var(--accent-orange);
+  font-weight: 600;
+  background: var(--accent-orange-dim);
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  border-radius: 2px;
+}
+
+.tac-rank-tag {
+  color: var(--accent-cyan);
+  border-left: 1px solid var(--border-dim);
+  padding-left: 10px;
+}
+
+/* Main Split View: Left Tactical Nav + Right Viewport */
+#main-container {
+  display: flex;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Left Sidebar Navigation (Matching User Reference Image) */
+#tactical-sidebar {
+  width: 220px;
+  background: rgba(17, 21, 28, 0.95);
+  border-right: 1px solid var(--border-dim);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 0;
+  z-index: 50;
+  backdrop-filter: blur(10px);
+}
+
+.tac-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+  background: transparent;
+}
+
+.tac-nav-item:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.tac-nav-item.active {
+  color: #fff;
+  border-left: 4px solid var(--accent-orange);
+  background: linear-gradient(90deg, rgba(255, 152, 0, 0.12) 0%, transparent 100%);
+  text-shadow: 0 0 10px rgba(255, 152, 0, 0.4);
+}
+
+.tac-nav-item .icon {
+  font-size: 16px;
+  opacity: 0.8;
+}
+
+/* Screens / Content Panels */
+#screens-viewport {
+  flex: 1;
+  position: relative;
+  overflow-y: auto;
+  background: transparent;
+}
+
+.screen-panel {
+  display: none;
+  width: 100%;
+  height: 100%;
+  padding: 28px 36px;
+  overflow-y: auto;
+  animation: fadeIn 0.25s ease forwards;
+}
+
+.screen-panel.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Tactical Subheaders and Headers */
+.tac-breadcrumb {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 6px;
+}
+
+.tac-screen-title {
+  font-size: 28px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #fff;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-dim);
+  padding-bottom: 12px;
+}
+
+/* Profile Grid */
+.profile-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 24px;
+}
+
+.tac-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-dim);
+  border-radius: 4px;
+  padding: 20px;
+  position: relative;
+}
+
+.tac-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  border-top: 2px solid var(--border-bright);
+  border-left: 2px solid var(--border-bright);
+}
+
+.tac-avatar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.tac-avatar-preset {
+  width: 110px;
+  height: 110px;
+  border-radius: 4px;
+  border: 2px solid var(--accent-orange);
+  background: rgba(20, 24, 32, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+
+.tac-avatar-img {
+  width: 110px;
+  height: 110px;
+  border-radius: 4px;
+  object-fit: cover;
+  border: 2px solid var(--accent-orange);
+}
+
+.tac-avatar-initials {
+  font-size: 32px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.tac-avatar-sub {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  letter-spacing: 1px;
+}
+
+.tac-input-group {
+  margin-bottom: 16px;
+}
+
+.tac-label {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.tac-input {
+  width: 100%;
+  background: #0d0f12;
+  border: 1px solid var(--border-dim);
+  color: #fff;
+  padding: 10px 14px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  border-radius: 2px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.tac-input:focus {
+  border-color: var(--accent-orange);
+}
+
+.tac-btn {
+  background: var(--bg-surface);
+  color: var(--text-main);
+  border: 1px solid var(--border-dim);
+  padding: 10px 20px;
+  font-family: var(--font-tactical);
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.tac-btn:hover {
+  background: var(--border-dim);
+  color: #fff;
+  border-color: var(--accent-orange);
+}
+
+.tac-btn.primary, .tac-btn.active-btn {
+  background: var(--accent-orange);
+  color: #000;
+  border-color: var(--accent-orange);
+}
+
+.tac-btn.primary:hover {
+  background: #ffb74d;
+}
+
+/* Rank Progress Bar */
+.tac-rank-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  border: 1px solid var(--accent-orange);
+  border-radius: 2px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+
+.tac-progress-track {
+  width: 100%;
+  height: 6px;
+  background: #0d0f12;
+  border: 1px solid var(--border-dim);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.tac-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-orange) 0%, #ffcc80 100%);
+  width: 0%;
+  transition: width 0.4s ease;
+}
+
+/* Stats Metrics Cards */
+.stats-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.metric-box {
+  background: rgba(13, 15, 18, 0.7);
+  border: 1px solid var(--border-dim);
+  padding: 16px;
+  text-align: center;
+}
+
+.metric-val {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-lbl {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+/* Armory Weapons Grid */
+.weapons-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.tac-weapon-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-dim);
+  border-radius: 4px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.25s;
+}
+
+.tac-weapon-card.active-selected {
+  border-color: var(--accent-orange);
+  box-shadow: 0 0 15px rgba(255, 152, 0, 0.2);
+}
+
+.tac-weapon-card.locked {
+  opacity: 0.75;
+}
+
+.tac-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.tac-weapon-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.tac-weapon-cat {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-orange);
+}
+
+.tac-weapon-blueprint {
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  margin: 10px 0;
+}
+
+.tac-weapon-card.active-selected .tac-weapon-blueprint {
+  color: var(--accent-orange);
+}
+
+.tac-stats-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.tac-stat-bar-group .lbl {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.tac-stat-bar-group .bar {
+  height: 4px;
+  background: #0d0f12;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.tac-stat-bar-group .bar .fill {
+  height: 100%;
+  background: var(--accent-cyan);
+}
+
+/* Lobby Roster & Pin */
+.lobby-pin-banner {
+  background: #0d0f12;
+  border: 1px dashed var(--accent-orange);
+  padding: 16px;
+  text-align: center;
+  font-size: 22px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--accent-orange);
+  letter-spacing: 4px;
+  margin-bottom: 24px;
+}
+
+.lobby-player-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(13, 15, 18, 0.7);
+  border: 1px solid var(--border-dim);
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.tac-p-callsign { font-weight: 700; color: #fff; }
+.tac-p-rank { color: var(--accent-orange); }
+.tac-p-ping { color: var(--accent-cyan); }
+.tac-p-status { color: #4caf50; }
+
+/* -------------------------------------------------------------------------
+   AR COMBAT VIEWFINDER (FULLSCREEN IMMERSIVE)
+   ------------------------------------------------------------------------- */
+#combat-screen {
+  padding: 0 !important;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 200;
+  background: #000;
+}
+
+#camera-feed {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#camera-feed.camera-simulated {
+  background: radial-gradient(circle, #10141b 10%, #06080a 90%);
+}
+
+/* Combat HUD Overlay */
+#combat-hud-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Screen Blood Vignette */
+#blood-vignette {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  box-shadow: inset 0 0 100px 30px rgba(255, 0, 0, 0.8);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+/* Tactical Crosshair */
+#tac-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 60px;
+  pointer-events: none;
+  transition: transform 0.08s ease, filter 0.15s ease;
+}
+
+.ch-circle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(0, 229, 255, 0.65);
+  border-radius: 50%;
+  transition: border-color 0.2s ease;
+}
+
+.ch-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 4px;
+  height: 4px;
+  background: var(--accent-cyan);
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+}
+
+.ch-line {
+  position: absolute;
+  background: rgba(0, 229, 255, 0.65);
+  transition: background 0.2s ease;
+}
+
+.ch-top { top: 0; left: 50%; transform: translateX(-50%); width: 1.5px; height: 10px; }
+.ch-bottom { bottom: 0; left: 50%; transform: translateX(-50%); width: 1.5px; height: 10px; }
+.ch-left { left: 0; top: 50%; transform: translateY(-50%); width: 10px; height: 1.5px; }
+.ch-right { right: 0; top: 50%; transform: translateY(-50%); width: 10px; height: 1.5px; }
+
+/* Target Locked State */
+#tac-crosshair.locked .ch-circle {
+  border-color: var(--accent-red);
+  box-shadow: 0 0 12px var(--accent-red);
+}
+#tac-crosshair.locked .ch-dot {
+  background: var(--accent-red);
+  box-shadow: 0 0 8px var(--accent-red);
+}
+#tac-crosshair.locked .ch-line {
+  background: var(--accent-red);
+}
+
+/* Target Lock Bounding Box */
+#tac-target-bbox {
+  position: absolute;
+  border: 2px solid var(--accent-red);
+  display: none;
+  pointer-events: none;
+  box-shadow: 0 0 15px rgba(255, 23, 68, 0.4);
+  transition: all 0.05s linear;
+}
+
+#tac-target-bbox::after {
+  content: 'HOSTILE DETECTED';
+  position: absolute;
+  top: -20px;
+  left: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent-red);
+  background: rgba(0,0,0,0.8);
+  padding: 1px 4px;
+  letter-spacing: 1px;
+}
+
+/* Status in Viewfinder */
+#tac-lock-status {
+  position: absolute;
+  top: 60%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--accent-cyan);
+  text-shadow: 0 0 6px var(--accent-cyan);
+}
+
+#tac-lock-status.locked {
+  color: var(--accent-red);
+  text-shadow: 0 0 8px var(--accent-red);
+  animation: pulseLock 0.5s infinite alternate;
+}
+
+@keyframes pulseLock {
+  from { opacity: 0.7; }
+  to { opacity: 1; }
+}
+
+#tac-distance-tag {
+  position: absolute;
+  top: 64%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: #fff;
+  opacity: 0.8;
+}
+
+/* Muzzle Flash */
+#muzzle-flash {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,170,0,0.85) 30%, transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.04s ease-out;
+}
+
+/* PUBG Hitmarker "X" */
+#tac-hitmarker {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(45deg);
+  width: 26px;
+  height: 26px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.06s ease;
+}
+
+#tac-hitmarker::before, #tac-hitmarker::after {
+  content: '';
+  position: absolute;
+  background: #ff1744;
+  box-shadow: 0 0 8px #ff1744;
+}
+
+#tac-hitmarker::before {
+  top: 0; left: 11px; width: 4px; height: 26px;
+}
+
+#tac-hitmarker::after {
+  left: 0; top: 11px; width: 26px; height: 4px;
+}
+
+#tac-hitmarker.active {
+  opacity: 1;
+}
+
+/* Floating Damage Numbers */
+#floating-damage-container {
+  position: absolute;
+  top: 45%;
+  left: 52%;
+  pointer-events: none;
+}
+
+.floating-dmg {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 0 8px rgba(0,0,0,0.9), 0 0 4px #ff1744;
+  animation: floatDmg 0.85s ease-out forwards;
+}
+
+.floating-dmg.headshot {
+  color: #ff9800;
+  font-size: 26px;
+  text-shadow: 0 0 10px #ff9800;
+}
+
+@keyframes floatDmg {
+  0% { opacity: 1; transform: translate(0, 0) scale(1); }
+  60% { opacity: 1; transform: translate(15px, -35px) scale(1.15); }
+  100% { opacity: 0; transform: translate(25px, -55px) scale(0.9); }
+}
+
+/* Drone Simulation Target */
+#ar-drone-target {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  transform: translate(-50%, -50%);
+  display: none;
+  pointer-events: none;
+}
+
+#ar-drone-target svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 8px rgba(255, 23, 68, 0.7));
+}
+
+/* Viewfinder Bottom Bar & Controls */
+#hud-bottom-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  pointer-events: auto;
+  background: linear-gradient(180deg, transparent 0%, rgba(13,15,18,0.85) 100%);
+}
+
+.hud-hp-box {
+  width: 180px;
+}
+
+.hud-hp-label {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.hud-hp-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(0,0,0,0.6);
+  border: 1px solid var(--border-dim);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+#tac-hp-fill {
+  width: 100%;
+  height: 100%;
+  background: var(--accent-cyan);
+  transition: width 0.2s ease, background-color 0.2s ease;
+}
+
+/* Ammo & Weapon View */
+.hud-ammo-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#tac-weapon-name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-orange);
+  letter-spacing: 1px;
+}
+
+.hud-ammo-numbers {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+}
+
+#tac-ammo-reserve {
+  font-size: 16px;
+  color: var(--text-dim);
+}
+
+/* Fire & Reload Triggers */
+.hud-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.tac-round-btn {
+  width: 65px;
+  height: 65px;
+  border-radius: 50%;
+  background: rgba(20, 24, 32, 0.85);
+  border: 2px solid var(--border-bright);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-tactical);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+  position: relative;
+}
+
+.tac-round-btn:active {
+  transform: scale(0.92);
+}
+
+#btn-fire-trigger {
+  width: 80px;
+  height: 80px;
+  background: radial-gradient(circle, #ff9800 0%, #e65100 80%);
+  border: 2px solid #fff;
+  color: #000;
+  font-size: 16px;
+  font-weight: 800;
+  box-shadow: 0 0 25px rgba(255, 152, 0, 0.5);
+}
+
+/* Reload Ring SVG */
+#tac-reload-ring {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  transition: stroke-dashoffset 0.05s linear;
+}
+
+/* Match Outcome Overlay */
+#match-outcome-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(13, 15, 18, 0.95);
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+}
+
+#match-outcome-overlay.hidden {
+  display: none;
+}
+
+#outcome-title {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+#outcome-sub {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-bottom: 24px;
+}
+
+#outcome-stats {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-main);
+  background: var(--bg-surface);
+  padding: 12px 24px;
+  border: 1px solid var(--border-dim);
+  border-radius: 4px;
+  margin-bottom: 30px;
+}
+
+/* Toast alert banner */
+#tac-alert-banner {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: rgba(13, 15, 18, 0.95);
+  border: 1px solid var(--accent-orange);
+  color: #fff;
+  padding: 8px 20px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.25s ease;
+  z-index: 500;
+}
+
+#tac-alert-banner.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Responsive adjustments for mobile phone portrait & landscape */
+@media (max-width: 768px) {
+  #tactical-sidebar {
+    width: 68px;
+    padding: 10px 0;
+  }
+  .tac-nav-item span.lbl {
+    display: none;
+  }
+  .tac-nav-item {
+    justify-content: center;
+    padding: 16px 0;
+  }
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+  .stats-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .screen-panel {
+    padding: 16px;
+  }
+}

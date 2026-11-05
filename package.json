@@ -1,0 +1,22 @@
+{
+  "name": "realstrike-ar",
+  "version": "1.0.0",
+  "description": "RealStrike AR - Autonomous Android Tactical AR Laser Tag Shooter",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "sync": "node scripts/sync-assets.js",
+    "build:apk": "node scripts/sync-assets.js && cd android && ./gradlew assembleDebug"
+  },
+  "keywords": [
+    "augmented-reality",
+    "laser-tag",
+    "fps",
+    "pubg",
+    "webrtc",
+    "computer-vision",
+    "android"
+  ],
+  "author": "RealStrike Tactical Systems",
+  "license": "MIT"
+}
