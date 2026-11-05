@@ -7,6 +7,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -40,9 +43,36 @@ jobs:
         run: |
           gradle assembleDebug --stacktrace
 
+      - name: Rename APK for Clear Download
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk RealStrike-AR-v1.0.apk || true
+
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: RealStrike-AR-debug
           path: android/app/build/outputs/apk/debug/*.apk
           retention-days: 14
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: v1.0.0
+          name: "RealStrike AR v1.0.0 — Standalone Laser Tag APK"
+          body: |
+            ## 🎯 RealStrike AR — Mustaqil Android Taktik AR Shooter (Laser Tag)
+
+            Qimmatbaho VR ko'zoynaksiz, smartfon kamerasi orqali real hayotda do'stlar bilan o'ynaladigan AR Laser Tag / PUBG otishma o'yini.
+
+            ### 🚀 Imkoniyatlar:
+            - **100% Offline Standalone APK:** Hech qanday tashqi sayt yoki PWA ga ulanmagan.
+            - **0-Ping WebRTC P2P:** Bitta Wi-Fi yoki Hotspot tarmog'ida 2-5ms kechikish bilan o'ynash.
+            - **AR Viewfinder & CV Lock:** 60 FPS kamera, inson gavdasini aniqlash (`[TARGET LOCKED]`), nishon qizilga aylanishi.
+            - **Zarba va Vibratsiya:** O'q tekkan raqib telefoni titraydi, ekranda qon vinyetkasi va HP ketadi. Otuvchida PUBG "X" hitmarkeri.
+            - **PUBG Taktik Profil & Armory:** Bronze dan Conqueror gacha darajalar, M416, AKM va AWM snayperi.
+          files: |
+            RealStrike-AR-v1.0.apk
+            android/app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
