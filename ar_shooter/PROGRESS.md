@@ -57,18 +57,45 @@
    - `flutter analyze`: 0 xato, 0 ogohlantirish (`No issues found!`).
    - `flutter test`: Barcha 7 ta unit test (`lan_test`, `pose_test`, `widget_test`) 100% muvaffaqiyatli o'tdi.
 
+## 📌 PHASE 2: Gibrid Nishon Hisoblash (Odam + Jamoa Rangi + GPS/Kompas) (Yakunlandi)
+
+### ✅ Amalga oshirilgan ishlar (Done):
+1. **Jamoalar va Ranglar tizimi (`lib/data/teams.dart`):**
+   - 4 ta jamoa rangi belgilandi: `red` (Qizil), `blue` (Ko'k), `green` (Yashil), `yellow` (Sariq).
+   - HSV rang spektri (hue) va to'yinganlik (saturation) filtri: Oq, qora, kulrang kiyimlar (`saturation < 0.22` yoki `value < 0.15`) `unknown` deb belgilanadi.
+   - Do'stona zarba (Friendly Fire) tekshiruvi: O'z jamoasiga qarata otilganda zarba o'tmaydi.
+2. **Kamera YUV buferidan Tana (Torso) rangini to'g'ridan-to'g'ri namunalash:**
+   - Yelkalar va sonlar nuqtalari orasidagi to'rtburchak tana sohasidan YUV buferi orqali tejamkor piksellar olinadi (ortiqcha to'liq RGB konvertatsiya xotirasi ajratilmasdan).
+   - Mediana hue hisoblanib, dushman jamoa rangi aniqlanadi.
+3. **GPS va Kompas orqali Nishonlash (`SensorsService`):**
+   - `geolocator` va `sensors_plus` integratsiyasi: Xona ichidagi har bir o'yinchi har 500 ms (2 Hz)da koordinatalari (`lat`, `lon`, `heading`, `accuracy`)ni uzatadi.
+   - Buyuk doira (great-circle) bearing formulasi va Haversine masofa hisoblagichi.
+   - Kamera 65° FOV va krossxeyr gorizontal og'ishi hisobga olingan holda, burchak xatosi `< 15°` va masofasi `2-100m` oralig'idagi eng yaqin raqib aniqlanadi.
+   - Burchak aylanmasi (359° dan 1° gacha bo'lgan 2° masofa) to'g'ri ishlanadi.
+4. **Fallback Ketma-ketligi (Zaxira zanjiri):**
+   - Agar GPS aniqligi yomonlashsa (`> 15m`), yoki kompas nishon topa olmasa, yoki kiyim rangi `unknown` bo'lsa: zarba dushman jamoasiga yozilib, jamoaning tasodifiy a'zosi tanlanadi.
+5. **Xost Tomonidan Tasdiqlash (Host Authoritative Validation):**
+   - Otuvchi tirikligi, nishon tirikligi, qurol o't ochish tezligi (cooldown), qurolning maksimal masofasi, va vaqt og'ishi (`skew < 2000 ms`) xost tomonidan qat'iy tekshiriladi.
+   - Tasdiqlangan zarba TCP orqali barchaga `damage` va `kill` xabari qilib tarqatiladi.
+6. **Zarba qabul qilgan telefon reaksiyasi va HUD ko'rsatkichi:**
+   - Jabrlanuvchi telefonda kuchli vibratsiya, qizil qonli fonga miltillash va HP tushishi.
+   - HUD ekranida zarba nima asosida hisoblanganligi belgilanadi: `[🎯 Odam]`, `[🛡️ Jamoa]` yoki `[🛰️ GPS]`.
+7. **Sifat nazorati va Testlar:**
+   - `flutter analyze`: 0 xato, 0 ogohlantirish (`No issues found!`).
+   - `flutter test`: Barcha 12 ta unit test (`hit_resolver_test`, `lan_test`, `pose_test`, `widget_test`) to'liq o'tdi.
+
 ### 🔄 Jarayondagi ishlar (In Progress):
-- PHASE 2 kutmoqda: Gibrid nishon hisoblash (Odam + Jamoa kiyim rangi + GPS/kompas).
+- PHASE 3 kutmoqda: Qurollar arsenali, audio effektlar, bombalar, granata va o'ljalar (loot).
 
 ### ⚠️ Ma'lum cheklovlar (Known Limits):
-- Juda qorong'i muhitda kamera odam pozasini aniqlay olmasligi mumkin; bunday holatda tizim 5 soniyadan so'ng mashg'ulot rejimiga o'tadi.
+- Xona ichida devorlar orqali GPS signali tushib ketganida zaxira tana rangi va krossxeyr odam ramkasi zarbani to'liq ta'minlaydi.
 
 ---
 
 ## Keyingi bosqichlar rejalari:
 - [x] PHASE 0: Setup, permissions, first APK
 - [x] PHASE 1: Real person detection + scope
-- [ ] PHASE 2: Combined hit resolution (person + team color + GPS/compass)
+- [x] PHASE 2: Combined hit resolution (person + team color + GPS/compass)
 - [ ] PHASE 3: Weapons, sound, bombs, loot
 - [ ] PHASE 4: Registration, profile, progression
 - [ ] PHASE 5: Rock-solid local multiplayer (WiFi LAN / hotspot)

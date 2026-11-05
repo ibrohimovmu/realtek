@@ -6,8 +6,12 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../data/teams.dart';
+import '../models/hit_event.dart';
 import '../services/detection_service.dart';
+import '../services/hit_resolver.dart';
 import '../services/lan.dart';
+import '../services/sensors_service.dart';
 import '../services/store.dart';
 import '../theme.dart';
 
@@ -53,6 +57,8 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
   bool _isRealPerson = false;
   double _targetDistance = 3.5;
   double _scopeZoom = 1.0;
+  TeamColor _detectedTorsoColor = TeamColor.unknown;
+  String? _hitConfidenceReason;
 
   // Player combat state
   int _hp = 100;
@@ -76,6 +82,13 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
     _initCam();
     _startSpawner();
     _startEnemyAttacks();
+
+    SensorsService.i.startTracking(onBroadcast: (data) => lan.pushState(data));
+    lan.onDamageReceived = (dmg, shooter, conf) {
+      if (!mounted) return;
+      _takeDamage(dmg);
+      _toast('$shooter sizga $dmg zarar yetkazdi ($conf)!');
+    };
 
     _roundTickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
@@ -130,6 +143,7 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
           _kind = Kind.enemy;
           _targetRect = person.screenRect;
           _targetDistance = person.distanceMeters;
+          _detectedTorsoColor = person.torsoColor;
           _isRealPerson = true;
           _lastDetectionTime = DateTime.now();
         });
@@ -219,7 +233,7 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
   void _takeDamage(int rawDmg) {
     final finalDmg = s.absorbDamage(rawDmg);
     setState(() {
-      _hp = max(0, _hp - finalDmg);
+      _hp = max(0, _hp - finalDmg).toInt();
       _showDamageBlood = true;
     });
 
@@ -300,14 +314,54 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
     final center = Offset(size.width / 2, size.height / 2);
 
     if (_kind == Kind.enemy && _targetRect.contains(center)) {
+      // Friendly fire check
+      if (_detectedTorsoColor != TeamColor.unknown && _detectedTorsoColor.id == s.team) {
+        _toast('Do\'stona zarba taqiqlangan! (O\'z jamoangiz)');
+        return;
+      }
+
       final isCrit = _r.nextDouble() < 0.25 || s.weapon.id == 'sniper';
       final dmg = isCrit ? (s.weapon.dmg * 1.5).round() : s.weapon.dmg;
+
+      // Combined hit resolution: Person + Team Color + GPS/Compass
+      final hitResult = HitResolver.resolveHit(
+        shooterId: s.name,
+        shooterTeam: s.team,
+        shooterLat: SensorsService.i.latitude,
+        shooterLon: SensorsService.i.longitude,
+        shooterHeading: SensorsService.i.heading,
+        shooterGpsAccuracy: SensorsService.i.accuracy,
+        estimatedPersonDistance: _targetDistance,
+        detectedTorsoColor: _detectedTorsoColor,
+        roomPlayers: lan.getRoomPlayerLocations(),
+      );
+
+      final confLabel = switch (hitResult.confidence) {
+        HitConfidence.gps => '🛰️ GPS (${_targetDistance.toStringAsFixed(1)}m)',
+        HitConfidence.team => '🛡️ Jamoa (${_detectedTorsoColor.name})',
+        HitConfidence.person => '🎯 Odam (${_targetDistance.toStringAsFixed(1)}m)',
+      };
 
       setState(() {
         _enemyHp -= dmg;
         _showHitmarker = true;
-        _floatingDamageText = isCrit ? 'CRIT -$dmg' : '-$dmg';
+        _hitConfidenceReason = confLabel;
+        _floatingDamageText = isCrit ? 'CRIT -$dmg\n$confLabel' : '-$dmg\n$confLabel';
       });
+
+      // Send to Host for Authoritative Validation
+      final hitEvent = HitEvent(
+        shooterId: s.name,
+        shooterName: s.name,
+        targetId: hitResult.targetPlayerId,
+        targetTeam: hitResult.targetTeam,
+        weaponId: s.weapon.id,
+        damage: dmg,
+        distanceMeters: hitResult.distanceMeters,
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+        confidence: hitResult.confidence,
+      );
+      lan.sendHitEvent(hitEvent);
 
       _playSound('audio/hit.wav');
       _triggerHaptic(isHit: true);
@@ -317,6 +371,9 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
       });
       Timer(const Duration(milliseconds: 800), () {
         if (mounted) setState(() => _floatingDamageText = null);
+      });
+      Timer(const Duration(milliseconds: 1400), () {
+        if (mounted) setState(() => _hitConfidenceReason = null);
       });
 
       if (_enemyHp <= 0) {
@@ -426,6 +483,8 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
     _attackTimer?.cancel();
     _roundTickTimer?.cancel();
     _reloadTimer?.cancel();
+    SensorsService.i.stopTracking();
+    lan.onDamageReceived = null;
     _cam?.stopImageStream().catchError((_) {});
     _cam?.dispose();
     _audioPlayer.dispose();
@@ -501,12 +560,38 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
                   _floatingDamageText!,
                   style: GoogleFonts.robotoMono(
                     color: _floatingDamageText!.contains('CRIT') ? kOrange : Colors.white,
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: FontWeight.w900,
                     shadows: [
                       const Shadow(color: Colors.black, blurRadius: 8),
                       Shadow(color: kRed.withValues(alpha: 0.8), blurRadius: 4),
                     ],
+                  ),
+                ),
+              ),
+
+            // Hit Confidence Indicator (Person / Team / GPS)
+            if (_hitConfidenceReason != null)
+              Positioned(
+                top: size.height / 2 + 36,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: kCyan, width: 1),
+                    ),
+                    child: Text(
+                      _hitConfidenceReason!,
+                      style: GoogleFonts.robotoMono(
+                        color: kCyan,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -590,14 +675,20 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
   Widget _buildTargetWidget() {
     final isEnemy = _kind == Kind.enemy;
     final color = isEnemy
-        ? (_isRealPerson ? kRed : _enemyCategory.color)
+        ? (_isRealPerson
+            ? (_detectedTorsoColor != TeamColor.unknown
+                ? _detectedTorsoColor.color
+                : kRed)
+            : _enemyCategory.color)
         : (_kind == Kind.medkit
             ? kGreen
             : (_kind == Kind.bandage ? kCyan : Colors.amber));
 
     final label = isEnemy
         ? (_isRealPerson
-            ? 'HOSTILE DETECTED (${_targetDistance.toStringAsFixed(1)}m)'
+            ? (_detectedTorsoColor != TeamColor.unknown
+                ? '${_detectedTorsoColor.name.toUpperCase()} (${_targetDistance.toStringAsFixed(1)}m)'
+                : 'HOSTILE DETECTED (${_targetDistance.toStringAsFixed(1)}m)')
             : _enemyCategory.title)
         : (_kind == Kind.medkit
             ? 'MEDKIT'

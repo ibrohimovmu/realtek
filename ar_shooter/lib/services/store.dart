@@ -12,6 +12,7 @@ class Store extends ChangeNotifier {
   late SharedPreferences _p;
 
   String name = '';
+  String team = 'blue';
   String equipped = 'pistol';
   int xp = 0;
   int coins = 200;
@@ -46,6 +47,7 @@ class Store extends ChangeNotifier {
     }
 
     name = _p.getString('name') ?? '';
+    team = _p.getString('team') ?? 'blue';
     equipped = _p.getString('eq') ?? 'pistol';
     xp = _p.getInt('xp') ?? 0;
     coins = _p.getInt('coins') ?? 200;
@@ -71,6 +73,7 @@ class Store extends ChangeNotifier {
 
   void save() {
     _p.setString('name', name);
+    _p.setString('team', team);
     _p.setString('eq', equipped);
     _p.setInt('xp', xp);
     _p.setInt('coins', coins);
@@ -98,6 +101,11 @@ class Store extends ChangeNotifier {
 
   void setName(String n) {
     name = n;
+    save();
+  }
+
+  void setTeam(String t) {
+    team = t;
     save();
   }
 

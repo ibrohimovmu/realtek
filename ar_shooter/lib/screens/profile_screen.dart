@@ -369,6 +369,20 @@ class ProfileScreen extends StatelessWidget {
                   },
                 ),
                 const SizedBox(height: 12),
+                const Text('Jamoangiz (Team Color):', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _teamChoiceChip(setModalState, 'blue', 'Ko\'k', const Color(0xFF228BE6)),
+                    const SizedBox(width: 8),
+                    _teamChoiceChip(setModalState, 'red', 'Qizil', const Color(0xFFFF2A4D)),
+                    const SizedBox(width: 8),
+                    _teamChoiceChip(setModalState, 'green', 'Yashil', const Color(0xFF2EE59D)),
+                    const SizedBox(width: 8),
+                    _teamChoiceChip(setModalState, 'yellow', 'Sariq', const Color(0xFFFFD43B)),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 Text('Nishon sezuvchanligi: ${(s.sensitivity * 100).round()}%'),
                 Slider(
                   activeColor: kPurple,
@@ -386,6 +400,33 @@ class ProfileScreen extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+
+  Widget _teamChoiceChip(
+    StateSetter setModalState,
+    String teamId,
+    String label,
+    Color color,
+  ) {
+    final isSelected = Store.i.team == teamId;
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? Colors.black : Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      selected: isSelected,
+      selectedColor: color,
+      backgroundColor: color.withValues(alpha: 0.15),
+      side: BorderSide(color: isSelected ? color : Colors.white24),
+      onSelected: (_) {
+        Store.i.setTeam(teamId);
+        setModalState(() {});
+      },
     );
   }
 }

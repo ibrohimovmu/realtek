@@ -1,18 +1,22 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import '../data/teams.dart';
 
 class DetectedPerson {
   final Rect screenRect;
   final double normalizedHeight;
   final double distanceMeters;
+  final TeamColor torsoColor;
   final List<PoseLandmark> landmarks;
 
   const DetectedPerson({
     required this.screenRect,
     required this.normalizedHeight,
     required this.distanceMeters,
+    required this.torsoColor,
     required this.landmarks,
   });
 }
@@ -95,6 +99,7 @@ class DetectionService {
       // Pick the most prominent pose (closest / largest)
       final primaryPose = poses.first;
       final person = _calculatePersonBounds(
+        image: image,
         pose: primaryPose,
         imageSize: Size(image.width.toDouble(), image.height.toDouble()),
         screenSize: screenSize,
@@ -110,6 +115,7 @@ class DetectionService {
   }
 
   DetectedPerson? _calculatePersonBounds({
+    required CameraImage image,
     required Pose pose,
     required Size imageSize,
     required Size screenSize,
@@ -151,6 +157,9 @@ class DetectionService {
     // Standing human ~ 1.7m. Distance ≈ (1.7 * 0.95) / normHeight
     final distance = (1.65 / normHeight.clamp(0.05, 0.98)).clamp(1.2, 45.0);
 
+    // Sample torso color directly from YUV buffer
+    final torsoColor = _sampleTorsoColor(image, pose);
+
     // Map image coordinates to screen coordinates
     // Camera image on portrait mobile is rotated 90/270 deg (width/height swapped)
     final scaleX = screenSize.width / imageSize.height;
@@ -181,8 +190,103 @@ class DetectionService {
       screenRect: screenRect,
       normalizedHeight: normHeight,
       distanceMeters: double.parse(distance.toStringAsFixed(1)),
+      torsoColor: torsoColor,
       landmarks: pose.landmarks.values.toList(),
     );
+  }
+
+  TeamColor _sampleTorsoColor(CameraImage image, Pose pose) {
+    try {
+      final ls = pose.landmarks[PoseLandmarkType.leftShoulder];
+      final rs = pose.landmarks[PoseLandmarkType.rightShoulder];
+      final lh = pose.landmarks[PoseLandmarkType.leftHip];
+      final rh = pose.landmarks[PoseLandmarkType.rightHip];
+
+      if (ls == null || rs == null || lh == null || rh == null) {
+        return TeamColor.unknown;
+      }
+
+      final minX = (min(ls.x, rs.x)).clamp(0.0, image.width.toDouble()).toInt();
+      final maxX = (max(ls.x, rs.x)).clamp(0.0, image.width.toDouble()).toInt();
+      final minY = (min(ls.y, rs.y)).clamp(0.0, image.height.toDouble()).toInt();
+      final maxY = (max(lh.y, rh.y)).clamp(0.0, image.height.toDouble()).toInt();
+
+      if (maxX <= minX + 4 || maxY <= minY + 4) return TeamColor.unknown;
+
+      final stepX = max(1, (maxX - minX) ~/ 5);
+      final stepY = max(1, (maxY - minY) ~/ 5);
+
+      final hues = <double>[];
+      final sats = <double>[];
+      final vals = <double>[];
+
+      final yPlane = image.planes[0];
+      final uPlane = image.planes.length > 1 ? image.planes[1] : null;
+      final vPlane = image.planes.length > 2 ? image.planes[2] : null;
+
+      for (int py = minY + stepY; py < maxY; py += stepY) {
+        for (int px = minX + stepX; px < maxX; px += stepX) {
+          final yIndex = py * yPlane.bytesPerRow + px;
+          if (yIndex >= yPlane.bytes.length) continue;
+          final yVal = yPlane.bytes[yIndex];
+
+          double uVal = 128.0;
+          double vVal = 128.0;
+
+          if (uPlane != null && vPlane != null) {
+            final uvIndex = (py ~/ 2) * (uPlane.bytesPerRow) + (px ~/ 2) * (uPlane.bytesPerPixel ?? 1);
+            if (uvIndex < uPlane.bytes.length && uvIndex < vPlane.bytes.length) {
+              uVal = uPlane.bytes[uvIndex].toDouble();
+              vVal = vPlane.bytes[uvIndex].toDouble();
+            }
+          }
+
+          final r = (yVal + 1.402 * (vVal - 128)).clamp(0, 255).toDouble();
+          final g = (yVal - 0.344136 * (uVal - 128) - 0.714136 * (vVal - 128)).clamp(0, 255).toDouble();
+          final b = (yVal + 1.772 * (uVal - 128)).clamp(0, 255).toDouble();
+
+          final maxC = max(r, max(g, b));
+          final minC = min(r, min(g, b));
+          final delta = maxC - minC;
+
+          double hue = 0.0;
+          if (delta > 0) {
+            if (maxC == r) {
+              hue = 60 * (((g - b) / delta) % 6);
+            } else if (maxC == g) {
+              hue = 60 * (((b - r) / delta) + 2);
+            } else {
+              hue = 60 * (((r - g) / delta) + 4);
+            }
+          }
+          if (hue < 0) hue += 360;
+
+          final sat = maxC == 0 ? 0.0 : (delta / maxC);
+          final val = maxC / 255.0;
+
+          hues.add(hue);
+          sats.add(sat);
+          vals.add(val);
+        }
+      }
+
+      if (hues.isEmpty) return TeamColor.unknown;
+      hues.sort();
+      sats.sort();
+      vals.sort();
+
+      final medianHue = hues[hues.length ~/ 2];
+      final medianSat = sats[sats.length ~/ 2];
+      final medianVal = vals[vals.length ~/ 2];
+
+      return matchHueToTeam(
+        hue: medianHue,
+        saturation: medianSat,
+        value: medianVal,
+      );
+    } catch (_) {
+      return TeamColor.unknown;
+    }
   }
 
   InputImage? _buildInputImage(CameraImage image, CameraDescription camera) {

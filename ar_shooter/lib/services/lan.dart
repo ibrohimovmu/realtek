@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import '../models/hit_event.dart';
+import 'hit_resolver.dart';
 import 'store.dart';
 
 enum ConnectionStatus {
@@ -57,6 +59,8 @@ class Lan {
   final discoveredRooms = ValueNotifier<List<RoomBeacon>>([]);
   final killFeed = ValueNotifier<List<String>>([]);
   final matchRound = ValueNotifier<MatchRound?>(null);
+  Function(int damage, String shooterName, String conf)? onDamageReceived;
+  final Map<String, int> _lastPlayerShotTs = {};
 
   // Host state
   ServerSocket? _srv;
@@ -80,10 +84,30 @@ class Lan {
 
   Map<String, dynamic> _me() => {
         'n': Store.i.name,
+        'team': Store.i.team,
         'xp': Store.i.xp,
         'k': Store.i.kills,
+        'hp': 100,
         'eq': Store.i.equipped,
       };
+
+  List<PlayerLocation> getRoomPlayerLocations() {
+    final list = <PlayerLocation>[];
+    players.value.forEach((name, data) {
+      list.add(PlayerLocation(
+        id: name,
+        name: name,
+        team: data['team']?.toString() ?? 'blue',
+        latitude: (data['lat'] as num?)?.toDouble() ?? 41.3111,
+        longitude: (data['lon'] as num?)?.toDouble() ?? 69.2797,
+        heading: (data['heading'] as num?)?.toDouble() ?? 0.0,
+        accuracy: (data['acc'] as num?)?.toDouble() ?? 999.0,
+        timestamp: (data['ts'] as num?)?.toInt() ?? 0,
+        hp: (data['hp'] as num?)?.toInt() ?? 100,
+      ));
+    });
+    return list;
+  }
 
   // --- UDP Auto-Discovery ---
 
@@ -225,6 +249,14 @@ class Lan {
       return;
     }
 
+    if (type == 'hit') {
+      try {
+        final hit = HitEvent.fromJson(Map<String, dynamic>.from(m));
+        _processHitOnHost(hit);
+      } catch (_) {}
+      return;
+    }
+
     if (type == 'join') {
       String playerName = m['n']?.toString() ?? 'Player';
       playerName = ensureUniquePlayerName(playerName, players.value.keys);
@@ -237,6 +269,62 @@ class Lan {
     // Default player update
     _merge(m);
     _broadcast();
+  }
+
+  void _processHitOnHost(HitEvent hit) {
+    final shooter = players.value[hit.shooterName];
+    final shooterHp = (shooter?['hp'] as num?)?.toInt() ?? 100;
+
+    final targetName = hit.targetId;
+    final target = targetName != null ? players.value[targetName] : null;
+    final targetHp = (target?['hp'] as num?)?.toInt() ?? 100;
+
+    final lastShot = _lastPlayerShotTs[hit.shooterName] ?? 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    final isValid = HitResolver.validateHitOnHost(
+      hit: hit,
+      shooterHp: shooterHp,
+      targetHp: target != null ? targetHp : null,
+      lastShooterFireTimestamp: lastShot,
+      weaponFireRateMs: 80,
+      weaponMaxRangeMeters: 150.0,
+      hostCurrentTimestamp: now,
+    );
+
+    if (!isValid) return;
+    _lastPlayerShotTs[hit.shooterName] = now;
+
+    if (targetName != null && target != null) {
+      final newHp = (targetHp - hit.damage).clamp(0, 100);
+      target['hp'] = newHp;
+      _broadcast();
+
+      final damageMsg = {
+        'type': 'damage',
+        'target': targetName,
+        'dmg': hit.damage,
+        'shooter': hit.shooterName,
+        'conf': hit.confidence.key,
+      };
+      _broadcastMessage(damageMsg);
+
+      if (targetName == Store.i.name) {
+        onDamageReceived?.call(hit.damage, hit.shooterName, hit.confidence.key);
+      }
+
+      if (newHp <= 0) {
+        reportKill(targetName);
+      }
+    }
+  }
+
+  void sendHitEvent(HitEvent hit) {
+    if (isHost) {
+      _processHitOnHost(hit);
+    } else if (_up != null) {
+      _up!.write('${jsonEncode(hit.toJson())}\n');
+    }
   }
 
   // --- Client Implementation ---
@@ -296,6 +384,17 @@ class Lan {
 
     if (type == 'kill') {
       _recordKillEvent(m['killer']?.toString() ?? '', m['victim']?.toString() ?? '');
+      return;
+    }
+
+    if (type == 'damage') {
+      final victim = m['target']?.toString();
+      final dmg = (m['dmg'] as num?)?.toInt() ?? 20;
+      final shooter = m['shooter']?.toString() ?? 'Raqib';
+      final conf = m['conf']?.toString() ?? 'person';
+      if (victim == Store.i.name) {
+        onDamageReceived?.call(dmg, shooter, conf);
+      }
       return;
     }
 
@@ -388,6 +487,17 @@ class Lan {
       _broadcast();
     } else if (_up != null) {
       _up!.write('${jsonEncode(_me())}\n');
+    }
+  }
+
+  void pushState(Map<String, dynamic> stateData) {
+    stateData['n'] = Store.i.name;
+    stateData['team'] = Store.i.team;
+    if (_srv != null) {
+      _merge(stateData);
+      _broadcast();
+    } else if (_up != null) {
+      _up!.write('${jsonEncode(stateData)}\n');
     }
   }
 
