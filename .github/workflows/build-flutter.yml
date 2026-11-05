@@ -1,0 +1,88 @@
+name: Build AR Shooter Flutter APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-flutter:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Get Dependencies
+        working-directory: ar_shooter
+        run: flutter pub get
+
+      - name: Run Flutter Analyze
+        working-directory: ar_shooter
+        run: flutter analyze
+
+      - name: Run Unit Tests
+        working-directory: ar_shooter
+        run: flutter test
+
+      - name: Build Universal Release APK
+        working-directory: ar_shooter
+        run: flutter build apk --release
+
+      - name: Build Split per ABI APKs
+        working-directory: ar_shooter
+        run: flutter build apk --split-per-abi --release
+
+      - name: Copy & Rename APKs
+        run: |
+          mkdir -p output_apks
+          cp ar_shooter/build/app/outputs/flutter-apk/app-release.apk output_apks/ARShooter-Flutter-Universal.apk
+          cp ar_shooter/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk output_apks/ARShooter-Flutter-arm64.apk || true
+          cp ar_shooter/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk output_apks/ARShooter-Flutter-armeabi.apk || true
+
+      - name: Upload APK Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ARShooter-Flutter-APKs
+          path: output_apks/*.apk
+          retention-days: 14
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: v2.0.0
+          name: "AR Shooter v2.0.0 (Official Flutter Release)"
+          body: |
+            ## 🎯 AR Shooter — Mobile Taktik AR Shooter (Flutter)
+
+            O'zbek tilidagi to'liq mahalliy va Wi-Fi orqali do'stlar bilan o'ynaladigan taktik AR otishma o'yini.
+
+            ### 🚀 Imkoniyatlar:
+            - **Mahalliy Xotira (No Firebase):** Barcha qurollar, tangalar, darajalar telefon xotirasida xavfsiz saqlanadi.
+            - **Lokal Wi-Fi / Hotspot LAN:** UDP Auto-discovery orqali xonalarni 1 bosishda topish va 0-ping TCP ulanish.
+            - **AR Kamera & Haqiqiy Nishonlar:** Ekran markazidagi krossxeyr orqali otish, qurol tepishi (recoil) va vibratsiya.
+            - **Boy Arsenal:** P92, UMP45, M416, S12K Shotgun, AWM Snayper.
+            - **Zirh & Tibbiyot:** Kevlar zirh (60% zararni yutadi), aptechka va bog'lamlar.
+            - **Kunlik Bonus & Reyting:** 7 kunlik qatnov bonusi, unvonlar va botlar bilan jonli peshqadamlar jadvali.
+          files: output_apks/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
