@@ -1,14 +1,15 @@
 /**
  * RealStrike AR - Tactical Operator Profile & Progression Engine
+ * Zero emojis - Pure Military HUD Nomenclature
  */
 const TACTICAL_RANKS = [
-  { name: 'BRONZE', minExp: 0, icon: '🛡️', color: '#cd7f32', tier: 'V' },
-  { name: 'SILVER', minExp: 500, icon: '⚔️', color: '#c0c0c0', tier: 'IV' },
-  { name: 'GOLD', minExp: 1000, icon: '🎖️', color: '#ffd700', tier: 'III' },
-  { name: 'PLATINUM', minExp: 2000, icon: '💎', color: '#00e5ff', tier: 'II' },
-  { name: 'DIAMOND', minExp: 3500, icon: '🔷', color: '#3d84ff', tier: 'I' },
-  { name: 'ACE', minExp: 5500, icon: '👑', color: '#ff5252', tier: 'ELITE' },
-  { name: 'CONQUEROR', minExp: 8000, icon: '⚡', color: '#ff9800', tier: 'TOP 500' }
+  { name: 'BRONZE', minExp: 0, insignia: 'SPEC-OPS V', color: '#cd7f32', tier: 'TIER V' },
+  { name: 'SILVER', minExp: 500, insignia: 'OPERATOR IV', color: '#c0c0c0', tier: 'TIER IV' },
+  { name: 'GOLD', minExp: 1000, insignia: 'VETERAN III', color: '#ffd700', tier: 'TIER III' },
+  { name: 'PLATINUM', minExp: 2000, insignia: 'ELITE II', color: '#00e5ff', tier: 'TIER II' },
+  { name: 'DIAMOND', minExp: 3500, insignia: 'COMMANDO I', color: '#3d84ff', tier: 'TIER I' },
+  { name: 'ACE', minExp: 5500, insignia: 'APEX MASTER', color: '#ff5252', tier: 'ELITE' },
+  { name: 'CONQUEROR', minExp: 8000, insignia: 'SUPREME OVERLORD', color: '#ff9800', tier: 'TOP 500' }
 ];
 
 const DEFAULT_AVATARS = [
@@ -22,7 +23,7 @@ class ProfileManager {
   constructor() {
     this.data = {
       callsign: 'OPERATOR_' + Math.floor(1000 + Math.random() * 9000),
-      avatarType: 'preset', // 'preset' or 'custom'
+      avatarType: 'preset',
       avatarId: 'ghost',
       customAvatarData: null,
       exp: 120,
@@ -72,7 +73,6 @@ class ProfileManager {
     const expForNext = nextRank ? nextRank.minExp - currentRank.minExp : 1000;
     const progressInRank = nextRank ? exp - currentRank.minExp : expForNext;
     const rankPercent = nextRank ? Math.min(100, Math.floor((progressInRank / expForNext) * 100)) : 100;
-
     const level = Math.floor(exp / 350) + 1;
 
     return {
@@ -121,7 +121,7 @@ class ProfileManager {
 
   getAvatarHtml() {
     if (this.data.avatarType === 'custom' && this.data.customAvatarData) {
-      return `<img src="${this.data.customAvatarData}" class="tac-avatar-img" alt="Operator Avatar"/>`;
+      return `<img src="${this.data.customAvatarData}" class="tac-avatar-img" alt="Operator Biometric"/>`;
     }
     const preset = DEFAULT_AVATARS.find(a => a.id === this.data.avatarId) || DEFAULT_AVATARS[0];
     return `<div class="tac-avatar-preset" style="border-color:${preset.color}">

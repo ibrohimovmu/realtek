@@ -9,6 +9,8 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -16,15 +18,17 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.webkit.WebViewAssetLoader;
 
 /**
- * RealStrike AR - Autonomous Android Native Activity
- * Fully Immersive Fullscreen, Hardware Accelerated, Auto Camera Grant.
+ * RealStrike AR - Tactical Autonomous Android Activity
+ * Fully Immersive, Hardware-Accelerated with Secure HTTPS Asset Loader for Camera WebRTC.
  */
 public class MainActivity extends AppCompatActivity {
 
     private static final int PERMISSION_REQ_CODE = 4721;
     private WebView webView;
+    private WebViewAssetLoader assetLoader;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,6 +39,10 @@ public class MainActivity extends AppCompatActivity {
 
         // Enable Fullscreen Immersive Sticky
         enableImmersiveMode();
+
+        assetLoader = new WebViewAssetLoader.Builder()
+                .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+                .build();
 
         webView = new WebView(this);
         setContentView(webView);
@@ -81,7 +89,12 @@ public class MainActivity extends AppCompatActivity {
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         webView.setBackgroundColor(0xFF0D0F12);
 
-        webView.setWebViewClient(new WebViewClient());
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                return assetLoader.shouldInterceptRequest(request.getUrl());
+            }
+        });
 
         // Auto grant Camera & Audio streams to the tactical AR engine
         webView.setWebChromeClient(new WebChromeClient() {
@@ -97,7 +110,8 @@ public class MainActivity extends AppCompatActivity {
     private void checkPermissionsAndLoad() {
         String[] requiredPerms = new String[]{
             Manifest.permission.CAMERA,
-            Manifest.permission.VIBRATE
+            Manifest.permission.VIBRATE,
+            Manifest.permission.RECORD_AUDIO
         };
 
         boolean allGranted = true;
@@ -124,8 +138,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void loadGameApp() {
-        // Loads standalone offline local assets bundled inside the APK
-        webView.loadUrl("file:///android_asset/public/index.html");
+        // Loads via secure HTTPS origin so navigator.mediaDevices.getUserMedia has 100% full hardware camera access!
+        webView.loadUrl("https://appassets.androidplatform.net/assets/public/index.html");
     }
 
     @Override
