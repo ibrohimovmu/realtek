@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/detection_service.dart';
 import '../services/lan.dart';
 import '../services/store.dart';
 import '../theme.dart';
@@ -48,6 +50,9 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
   int _enemyHp = 100;
   int _enemyMaxHp = 100;
   DateTime _lastDetectionTime = DateTime.now();
+  bool _isRealPerson = false;
+  double _targetDistance = 3.5;
+  double _scopeZoom = 1.0;
 
   // Player combat state
   int _hp = 100;
@@ -87,12 +92,69 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
       );
       final c = CameraController(
         backCam,
-        ResolutionPreset.high,
+        ResolutionPreset.medium,
         enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.yuv420,
+        imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.nv21 : ImageFormatGroup.yuv420,
       );
       await c.initialize();
-      if (mounted) setState(() => _cam = c);
+      
+      final initZoom = s.weapon.id == 'sniper' ? 2.0 : 1.0;
+      try {
+        await c.setZoomLevel(initZoom);
+      } catch (_) {}
+
+      if (mounted) {
+        setState(() {
+          _cam = c;
+          _scopeZoom = initZoom;
+        });
+      }
+
+      // Stream frames for ML Kit real person detection (~5 FPS throttled)
+      await c.startImageStream((image) => _onCameraImage(image));
+    } catch (_) {}
+  }
+
+  void _onCameraImage(CameraImage image) {
+    if (!mounted || _cam == null) return;
+    final size = MediaQuery.maybeOf(context)?.size ?? const Size(380, 700);
+
+    DetectionService.i.processFrame(
+      image: image,
+      camera: _cam!.description,
+      screenSize: size,
+    ).then((person) {
+      if (!mounted) return;
+      if (person != null) {
+        setState(() {
+          _kind = Kind.enemy;
+          _targetRect = person.screenRect;
+          _targetDistance = person.distanceMeters;
+          _isRealPerson = true;
+          _lastDetectionTime = DateTime.now();
+        });
+      }
+    }).catchError((_) {});
+  }
+
+  Future<void> _toggleScope() async {
+    if (_cam == null) return;
+    double nextZoom;
+    if (_scopeZoom < 1.9) {
+      nextZoom = 2.0;
+    } else if (_scopeZoom < 3.9) {
+      nextZoom = 4.0;
+    } else {
+      nextZoom = 1.0;
+    }
+
+    try {
+      final maxZoom = await _cam!.getMaxZoomLevel();
+      final targetZoom = min(nextZoom, maxZoom);
+      await _cam!.setZoomLevel(targetZoom);
+      if (mounted) {
+        setState(() => _scopeZoom = targetZoom);
+      }
     } catch (_) {}
   }
 
@@ -100,8 +162,14 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
     _spawnTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted) return;
       if (_kind != null) {
-        if (DateTime.now().difference(_lastDetectionTime).inSeconds > 9) {
+        final elapsed = DateTime.now().difference(_lastDetectionTime).inSeconds;
+        if (!_isRealPerson && elapsed > 8) {
           setState(() => _kind = null);
+        } else if (_isRealPerson && elapsed > 5) {
+          setState(() {
+            _isRealPerson = false;
+            _kind = null;
+          });
         }
         return;
       }
@@ -110,6 +178,7 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
       final size = MediaQuery.maybeOf(context)?.size ?? const Size(380, 700);
 
       setState(() {
+        _isRealPerson = false;
         if (roll < 0.60) {
           _kind = Kind.enemy;
           final catRoll = _r.nextDouble();
@@ -210,10 +279,11 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
     // Fire mechanics
     setState(() {
       _ammo--;
-      // Recoil kickback
+      // Recoil kickback (dampened when scoped)
+      final recoilScale = 1.0 / max(1.0, _scopeZoom * 0.75);
       _recoilOffset = Offset(
-        (_r.nextDouble() - 0.5) * s.weapon.recoil,
-        -s.weapon.recoil * 1.5,
+        (_r.nextDouble() - 0.5) * s.weapon.recoil * recoilScale,
+        -s.weapon.recoil * 1.5 * recoilScale,
       );
     });
 
@@ -356,8 +426,10 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
     _attackTimer?.cancel();
     _roundTickTimer?.cancel();
     _reloadTimer?.cancel();
-    _audioPlayer.dispose();
+    _cam?.stopImageStream().catchError((_) {});
     _cam?.dispose();
+    _audioPlayer.dispose();
+    DetectionService.i.dispose();
     super.dispose();
   }
 
@@ -387,6 +459,9 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
                   ),
                 ),
               ),
+
+            // Scope Overlay (1x / 2x / 4x sniper scope)
+            if (_scopeZoom > 1.0) _buildScopeOverlay(size),
 
             // Blood vignette flash on taking damage
             if (_showDamageBlood)
@@ -515,19 +590,21 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
   Widget _buildTargetWidget() {
     final isEnemy = _kind == Kind.enemy;
     final color = isEnemy
-        ? _enemyCategory.color
+        ? (_isRealPerson ? kRed : _enemyCategory.color)
         : (_kind == Kind.medkit
             ? kGreen
             : (_kind == Kind.bandage ? kCyan : Colors.amber));
 
     final label = isEnemy
-        ? _enemyCategory.title
+        ? (_isRealPerson
+            ? 'HOSTILE DETECTED (${_targetDistance.toStringAsFixed(1)}m)'
+            : _enemyCategory.title)
         : (_kind == Kind.medkit
             ? 'MEDKIT'
             : (_kind == Kind.bandage ? 'BANDAGE' : 'SUPPLY CRATE'));
 
     final icon = isEnemy
-        ? _enemyCategory.icon
+        ? (_isRealPerson ? Icons.person : _enemyCategory.icon)
         : (_kind == Kind.medkit
             ? Icons.medical_services
             : (_kind == Kind.bandage ? Icons.healing : Icons.inventory_2));
@@ -580,6 +657,103 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDebugOverlay() {
+    final ds = DetectionService.i;
+    final isSlow = ds.isSlow;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.75),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: isSlow ? kOrange : kCyan, width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isSlow ? Icons.warning_amber_rounded : Icons.speed,
+            color: isSlow ? kOrange : kCyan,
+            size: 11,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            isSlow
+                ? 'Aniqlash sekin'
+                : 'ML: ${ds.fps.toStringAsFixed(1)} FPS | ${ds.latencyMs}ms',
+            style: GoogleFonts.robotoMono(
+              color: isSlow ? kOrange : kCyan,
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScopeOverlay(Size size) {
+    if (_scopeZoom <= 1.0) return const SizedBox.shrink();
+
+    return IgnorePointer(
+      child: Stack(
+        children: [
+          // Dark Vignette outside circular lens
+          Container(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment.center,
+                radius: 0.72,
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withValues(alpha: 0.35),
+                  Colors.black.withValues(alpha: 0.88),
+                ],
+                stops: const [0.55, 0.75, 1.0],
+              ),
+            ),
+          ),
+          // Scope Ring and Mil-dots
+          Center(
+            child: Container(
+              width: size.width * 0.85,
+              height: size.width * 0.85,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: kCyan.withValues(alpha: 0.5), width: 1.5),
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(width: 1, height: size.width * 0.85, color: kCyan.withValues(alpha: 0.35)),
+                  Container(width: size.width * 0.85, height: 1, color: kCyan.withValues(alpha: 0.35)),
+                  Positioned(
+                    top: 14,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: kCyan, width: 0.8),
+                      ),
+                      child: Text(
+                        'SCOPE ${_scopeZoom.toStringAsFixed(0)}X',
+                        style: GoogleFonts.robotoMono(
+                          color: kCyan,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -653,6 +827,10 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
                 ),
               ),
             ),
+            const SizedBox(width: 8),
+          ],
+          if (s.debugOverlayEnabled) ...[
+            _buildDebugOverlay(),
             const SizedBox(width: 8),
           ],
           const Icon(Icons.monetization_on, color: kOrange, size: 16),
@@ -792,6 +970,31 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
             ),
           ),
           const SizedBox(width: 12),
+
+          // Scope Toggle Button (1X / 2X / 4X)
+          OutlinedButton(
+            onPressed: _toggleScope,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(54, 54),
+              shape: const CircleBorder(),
+              side: BorderSide(
+                color: _scopeZoom > 1.0 ? kCyan : Colors.white24,
+                width: _scopeZoom > 1.0 ? 2 : 1,
+              ),
+              backgroundColor: _scopeZoom > 1.0
+                  ? kCyan.withValues(alpha: 0.15)
+                  : Colors.transparent,
+            ),
+            child: Text(
+              '${_scopeZoom.toStringAsFixed(0)}X',
+              style: GoogleFonts.robotoMono(
+                color: _scopeZoom > 1.0 ? kCyan : Colors.white70,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
 
           // Reload Button with Animated Circular Progress
           Stack(

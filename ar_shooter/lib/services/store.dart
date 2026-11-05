@@ -27,6 +27,7 @@ class Store extends ChangeNotifier {
   bool vibrationEnabled = true;
   double sensitivity = 1.0;
   bool safetyAccepted = false;
+  bool debugOverlayEnabled = true;
 
   // Daily Streak
   int dailyStreak = 1;
@@ -59,6 +60,7 @@ class Store extends ChangeNotifier {
     vibrationEnabled = _p.getBool('vibe') ?? true;
     sensitivity = _p.getDouble('sens') ?? 1.0;
     safetyAccepted = _p.getBool('safety_accepted') ?? false;
+    debugOverlayEnabled = _p.getBool('debug_overlay') ?? true;
 
     dailyStreak = _p.getInt('daily_streak') ?? 1;
     lastDailyEpoch = _p.getInt('last_daily') ?? 0;
@@ -82,6 +84,7 @@ class Store extends ChangeNotifier {
     _p.setBool('sound', soundEnabled);
     _p.setBool('vibe', vibrationEnabled);
     _p.setDouble('sens', sensitivity);
+    _p.setBool('debug_overlay', debugOverlayEnabled);
 
     _p.setInt('daily_streak', dailyStreak);
     _p.setInt('last_daily', lastDailyEpoch);
@@ -102,6 +105,11 @@ class Store extends ChangeNotifier {
     safetyAccepted = true;
     _p.setBool('safety_accepted', true);
     notifyListeners();
+  }
+
+  void toggleDebugOverlay() {
+    debugOverlayEnabled = !debugOverlayEnabled;
+    save();
   }
 
   void addKill() {

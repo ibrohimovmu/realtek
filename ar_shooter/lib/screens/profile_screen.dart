@@ -357,6 +357,17 @@ class ProfileScreen extends StatelessWidget {
                     setModalState(() {});
                   },
                 ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  activeThumbColor: kPurple,
+                  title: const Text('FPS & Aniqlash Ko\'rsatkichi (Debug)'),
+                  subtitle: const Text('Ekranda kamera tezligi va ML kechikishini ko\'rsatish'),
+                  value: s.debugOverlayEnabled,
+                  onChanged: (v) {
+                    s.toggleDebugOverlay();
+                    setModalState(() {});
+                  },
+                ),
                 const SizedBox(height: 12),
                 Text('Nishon sezuvchanligi: ${(s.sensitivity * 100).round()}%'),
                 Slider(
