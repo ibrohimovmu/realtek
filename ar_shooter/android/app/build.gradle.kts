@@ -16,7 +16,7 @@ android {
 
     defaultConfig {
         applicationId = "com.arshooter.ar_shooter"
-        minSdk = 21
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

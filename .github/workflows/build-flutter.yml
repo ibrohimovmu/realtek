@@ -43,18 +43,16 @@ jobs:
         run: flutter test
 
       - name: Build Universal Release APK
-        working-directory: ar_shooter
         run: |
-          mkdir -p ../output_apks
-          flutter build apk --release --verbose
-          cp build/app/outputs/flutter-apk/app-release.apk ../output_apks/ARShooter-Flutter-Universal.apk
+          mkdir -p output_apks
+          cd ar_shooter && flutter build apk --release
+          cp -f ar_shooter/build/app/outputs/flutter-apk/app-release.apk output_apks/ARShooter-Flutter-Universal.apk
 
       - name: Build Split per ABI APKs
-        working-directory: ar_shooter
         run: |
-          flutter build apk --split-per-abi --release --verbose
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk ../output_apks/ARShooter-Flutter-arm64.apk || true
-          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk ../output_apks/ARShooter-Flutter-armeabi.apk || true
+          cd ar_shooter && flutter build apk --split-per-abi --release
+          cp -f ar_shooter/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk output_apks/ARShooter-Flutter-arm64.apk || true
+          cp -f ar_shooter/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk output_apks/ARShooter-Flutter-armeabi.apk || true
 
       - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
