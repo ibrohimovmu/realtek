@@ -1,5 +1,7 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'screens/camera_permission_screen.dart';
 import 'screens/onboarding.dart';
 import 'screens/safety_notice_screen.dart';
@@ -9,6 +11,15 @@ import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Bulletproof crash protection: handle any asynchronous platform/sensor exceptions
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('Safe handled platform error: $error');
+    return true; // Prevents crashing the app process on Android
+  };
+
+  // Offline-first fonts: never attempt HTTP downloading on device startup
+  GoogleFonts.config.allowRuntimeFetching = false;
   
   // Safe orientation lock
   try {
@@ -17,7 +28,7 @@ Future<void> main() async {
     debugPrint('Orientation lock error: $e');
   }
 
-  // Safe global error handler to prevent hard crashes
+  // Safe global Flutter UI error handler
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     debugPrint('Flutter Error: ${details.exception}');

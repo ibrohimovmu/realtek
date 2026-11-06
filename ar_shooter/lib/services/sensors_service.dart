@@ -30,26 +30,32 @@ class SensorsService extends ChangeNotifier {
             accuracy: LocationAccuracy.high,
             distanceFilter: 1,
           ),
-        ).listen((pos) {
-          latitude = pos.latitude;
-          longitude = pos.longitude;
-          accuracy = pos.accuracy;
-          if (pos.heading >= 0) heading = pos.heading;
-          notifyListeners();
-        });
+        ).listen(
+          (pos) {
+            latitude = pos.latitude;
+            longitude = pos.longitude;
+            accuracy = pos.accuracy;
+            if (pos.heading >= 0) heading = pos.heading;
+            notifyListeners();
+          },
+          onError: (_) {},
+        );
       }
     } catch (_) {}
 
     // Track heading from magnetometer / sensors
     try {
-      _magSub = magnetometerEventStream().listen((event) {
-        // Calculate 2D compass heading from X and Y magnetic field
-        final rad = atan2(event.y, event.x);
-        var deg = rad * (180.0 / pi);
-        if (deg < 0) deg += 360.0;
-        heading = deg;
-        notifyListeners();
-      });
+      _magSub = magnetometerEventStream().listen(
+        (event) {
+          // Calculate 2D compass heading from X and Y magnetic field
+          final rad = atan2(event.y, event.x);
+          var deg = rad * (180.0 / pi);
+          if (deg < 0) deg += 360.0;
+          heading = deg;
+          notifyListeners();
+        },
+        onError: (_) {},
+      );
     } catch (_) {}
 
     // Broadcast GPS + heading twice per second (2 Hz)

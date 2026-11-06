@@ -146,21 +146,24 @@ class Lan {
         udpBeaconPort,
         reuseAddress: true,
       );
-      _clientUdpListener!.listen((event) {
-        if (event == RawSocketEvent.read) {
-          final dg = _clientUdpListener!.receive();
-          if (dg == null) return;
-          try {
-            final msg = utf8.decode(dg.data);
-            final data = jsonDecode(msg) as Map<String, dynamic>;
-            if (data['type'] == 'beacon') {
-              _onBeaconReceived(
-                RoomBeacon.fromJson(data, dg.address.address),
-              );
-            }
-          } catch (_) {}
-        }
-      });
+      _clientUdpListener!.listen(
+        (event) {
+          if (event == RawSocketEvent.read) {
+            final dg = _clientUdpListener!.receive();
+            if (dg == null) return;
+            try {
+              final msg = utf8.decode(dg.data);
+              final data = jsonDecode(msg) as Map<String, dynamic>;
+              if (data['type'] == 'beacon') {
+                _onBeaconReceived(
+                  RoomBeacon.fromJson(data, dg.address.address),
+                );
+              }
+            } catch (_) {}
+          }
+        },
+        onError: (_) {},
+      );
 
       _roomCleanupTimer = Timer.periodic(const Duration(seconds: 4), (_) {
         final now = DateTime.now();

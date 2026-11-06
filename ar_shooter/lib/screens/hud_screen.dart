@@ -102,13 +102,16 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
     };
 
     try {
-      _gyroSub = gyroscopeEventStream().listen((e) {
-        if (!mounted) return;
-        setState(() {
-          _swayX = (_swayX * 0.75 + e.y * 3.0).clamp(-18.0, 18.0);
-          _swayY = (_swayY * 0.75 + e.x * 2.0).clamp(-12.0, 12.0);
-        });
-      });
+      _gyroSub = gyroscopeEventStream().listen(
+        (e) {
+          if (!mounted) return;
+          setState(() {
+            _swayX = (_swayX * 0.75 + e.y * 3.0).clamp(-18.0, 18.0);
+            _swayY = (_swayY * 0.75 + e.x * 2.0).clamp(-12.0, 12.0);
+          });
+        },
+        onError: (_) {},
+      );
     } catch (_) {}
 
     _bombBeepTimer = Timer.periodic(const Duration(seconds: 2), (_) {
