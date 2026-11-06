@@ -197,8 +197,37 @@
    - `flutter test`: Barcha 25 ta unit test 100% muvaffaqiyatli o'tdi.
    - `flutter analyze`: 0 xato, 0 ogohlantirish (`No issues found!`).
 
+## 📌 PHASE 7: Ixtiyoriy Onlayn Server va Global Reyting (Yakunlandi)
+
+### ✅ Amalga oshirilgan ishlar (Done):
+1. **FastAPI Onlayn Server (`ar_shooter/server/`):**
+   - Python FastAPI mikro-serveri: `main.py`, `models.py`, `database.py`, `requirements.txt`.
+   - SQLite ma'lumotlar bazasi (`players` va `rooms` jadvallari).
+   - REST API endpointlar:
+     - `GET /health`: Server sog'lig'i tekshiruvi.
+     - `POST /api/stats/sync`: O'yinchi natijalarini (XP, qatllar, o'limlar, nishonlar) serverga sinxronlash va global o'rnini (#rank) qaytarish.
+     - `GET /api/leaderboard`: Global reyting jadvalini eng yuqori XP bo'yicha saralab berish.
+     - `POST /api/rooms/announce`: O'yin xonalarini onlayn e'lon qilish.
+     - `GET /api/rooms`: Faol xonalar ro'yxatini olish (5 daqiqadan oshgan eski xonalar avtomatik tozalanadi).
+   - Python testlari (`test_server.py`) 100% muvaffaqiyatli o'tdi.
+2. **Flutter Onlayn Aloqa Klienti ([`server_client.dart`](file:///D:/c2q/ar_shooter/lib/services/server_client.dart)):**
+   - Tashqi ortiqcha paketlarsiz sof `dart:io` `HttpClient` orqali qurildi.
+   - 3 soniyalik timeout va xatoliklarni xavfsiz ushlab qolish (server o'chiq bo'lsa ham dastur qotmaydi yoki xato tashlamaydi).
+   - `checkHealth()`, `syncStats()`, `fetchLeaderboard()`, `announceRoom()`, `fetchRooms()`.
+3. **Sozlamalar Ekranida Server Aloqasi Testi ([`settings_screen.dart`](file:///D:/c2q/ar_shooter/lib/screens/settings_screen.dart)):**
+   - Server URL manzilini kiritish imkoniyati.
+   - "Aloqani Tekshirish" tugmasi orqali jonli ping testi (Online: yashil, Offline: to'q sariq).
+4. **Global Onlayn Reyting Ekrani ([`leaderboard_screen.dart`](file:///D:/c2q/ar_shooter/lib/screens/leaderboard_screen.dart)):**
+   - 3 ta toifali chip navigatsiyasi: "Lokal Reyting", "Global Onlayn", "Wi-Fi / Hotspot LAN".
+   - "Global Onlayn" tanlanganda serverdan jonli reyting jadvalini yuklash va Top-3 shohsupada aks ettirish.
+   - "Sinxronlash (Mening Natijamni Yuborish)" tugmasi orqali lokal natijalarni onlayn bazaga jo'natish.
+5. **Sifat nazorati va Testlar:**
+   - Yangi `test/server_client_test.dart` yozildi (oflayn holatda 0-crash tekshiruvlari).
+   - `flutter test`: Barcha 30 ta unit test 100% muvaffaqiyatli o'tdi (`All tests passed!`).
+   - `flutter analyze`: 0 ta xatolik, 0 ta ogohlantirish (`No issues found!`).
+
 ### 🔄 Jarayondagi ishlar (In Progress):
-- PHASE 7 kutmoqda: Ixtiyoriy onlayn server (Optional online FastAPI server, stats sync, matchmaking).
+- PHASE 8 kutmoqda: Yakuniy sifat tekshiruvi, release build va yetkazib berish (Quality and delivery).
 
 ---
 
@@ -210,5 +239,5 @@
 - [x] PHASE 4: Registration, profile, progression
 - [x] PHASE 5: Rock-solid local multiplayer (WiFi LAN / hotspot)
 - [x] PHASE 6: Polish pass 1
-- [ ] PHASE 7: Optional online server
+- [x] PHASE 7: Optional online server
 - [ ] PHASE 8: Quality and delivery

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/lan.dart';
+import '../services/server_client.dart';
 import '../services/store.dart';
 import '../theme.dart';
 
@@ -10,10 +11,15 @@ class LeaderboardScreen extends StatefulWidget {
 }
 
 class _LeaderboardScreenState extends State<LeaderboardScreen> {
-  bool _wifi = false;
+  // 0: Local, 1: Global Online, 2: Wi-Fi / Hotspot LAN
+  int _tabIndex = 0;
   String _timeframe = 'all';
   final _ipController = TextEditingController();
   String _info = '';
+
+  List<Map<String, dynamic>> _onlineLeaderboard = [];
+  bool _isLoadingOnline = false;
+  bool _isSyncing = false;
 
   static const _localBots = {
     'GHOST-01 (Apex)': 2450,
@@ -51,6 +57,41 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     }
   }
 
+  Future<void> _fetchOnlineLeaderboard() async {
+    setState(() => _isLoadingOnline = true);
+    final data = await ServerClient.i.fetchLeaderboard(limit: 50);
+    if (mounted) {
+      setState(() {
+        _onlineLeaderboard = data;
+        _isLoadingOnline = false;
+      });
+    }
+  }
+
+  Future<void> _syncMyStats() async {
+    setState(() => _isSyncing = true);
+    final res = await ServerClient.i.syncStats();
+    if (mounted) {
+      setState(() => _isSyncing = false);
+      if (res != null && res['status'] == 'ok') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Natijalar serverga yuklandi! O\'rningiz: #${res['rank']}'),
+            backgroundColor: kGreen,
+          ),
+        );
+        _fetchOnlineLeaderboard();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Serverga ulanib bo\'lmadi. Sozlamalarni tekshiring.'),
+            backgroundColor: kRed,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _runAction(Future<void> Function() f) async {
     try {
       await f();
@@ -64,14 +105,25 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     return ListenableBuilder(
       listenable: Listenable.merge([Store.i, Lan.i.players, Lan.i.discoveredRooms, Lan.i.status, Lan.i.matchRound]),
       builder: (_, __) {
-        final rows = _wifi
-            ? Lan.i.players.value.values
-                .map((m) => MapEntry('${m['n']}', (m['xp'] ?? 0) as int))
-                .toList()
-            : [
-                ..._localBots.entries,
-                MapEntry(Store.i.name, Store.i.xp),
-              ];
+        List<MapEntry<String, int>> rows;
+        if (_tabIndex == 2) {
+          rows = Lan.i.players.value.values
+              .map((m) => MapEntry('${m['n']}', (m['xp'] ?? 0) as int))
+              .toList();
+        } else if (_tabIndex == 1) {
+          rows = _onlineLeaderboard.isNotEmpty
+              ? _onlineLeaderboard
+                  .map((m) => MapEntry('${m['name']}', (m['xp'] ?? 0) as int))
+                  .toList()
+              : [
+                  MapEntry(Store.i.name, Store.i.xp),
+                ];
+        } else {
+          rows = [
+            ..._localBots.entries,
+            MapEntry(Store.i.name, Store.i.xp),
+          ];
+        }
         rows.sort((a, b) => b.value.compareTo(a.value));
 
         return Scaffold(
@@ -79,18 +131,45 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             backgroundColor: kBg,
             elevation: 0,
             title: const Text('Reyting & Multiplayer', style: TextStyle(fontWeight: FontWeight.bold)),
+            actions: [
+              if (_tabIndex == 1)
+                IconButton(
+                  icon: _isLoadingOnline
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: kPurple))
+                      : const Icon(Icons.refresh),
+                  onPressed: _isLoadingOnline ? null : _fetchOnlineLeaderboard,
+                  tooltip: 'Yangilash',
+                ),
+            ],
           ),
           body: Column(
             children: [
               // Segmented Chips
-              Padding(
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
                   children: [
                     ChoiceChip(
                       label: const Text('Lokal Reyting'),
-                      selected: !_wifi,
-                      onSelected: (_) => setState(() => _wifi = false),
+                      selected: _tabIndex == 0,
+                      onSelected: (_) => setState(() => _tabIndex = 0),
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.public, size: 16),
+                          SizedBox(width: 4),
+                          Text('Global Onlayn'),
+                        ],
+                      ),
+                      selected: _tabIndex == 1,
+                      onSelected: (_) {
+                        setState(() => _tabIndex = 1);
+                        if (_onlineLeaderboard.isEmpty) _fetchOnlineLeaderboard();
+                      },
                     ),
                     const SizedBox(width: 8),
                     ChoiceChip(
@@ -102,15 +181,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                           Text('Wi-Fi / Hotspot LAN'),
                         ],
                       ),
-                      selected: _wifi,
-                      onSelected: (_) => setState(() => _wifi = true),
+                      selected: _tabIndex == 2,
+                      onSelected: (_) => setState(() => _tabIndex = 2),
                     ),
                   ],
                 ),
               ),
 
               // Timeframe filter for Local Leaderboard
-              if (!_wifi)
+              if (_tabIndex == 0)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   child: Row(
@@ -142,8 +221,48 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   ),
                 ),
 
+              // Global Online Control Panel
+              if (_tabIndex == 1)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: card(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.cloud_sync, color: kPurple, size: 20),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Global Onlayn Reyting & Sinxronizatsiya',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ),
+                            FilledButton.icon(
+                              onPressed: _isSyncing ? null : _syncMyStats,
+                              icon: _isSyncing
+                                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Icon(Icons.arrow_upward, size: 16),
+                              label: const Text('Sinxronlash', style: TextStyle(fontSize: 12)),
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Server: ${Store.i.serverUrl.isEmpty ? "http://localhost:7860 (standart)" : Store.i.serverUrl}',
+                          style: const TextStyle(fontSize: 11, color: Colors.white54),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
               // Wi-Fi Multiplayer Panel
-              if (_wifi)
+              if (_tabIndex == 2)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   child: card(
@@ -313,58 +432,65 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
               // Leaderboard List
               Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: rows.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (_, i) {
-                    final isMe = rows[i].key == Store.i.name;
-                    return card(
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 28,
-                            child: Text(
-                              i < 3 ? ['🥇', '🥈', '🥉'][i] : '${i + 1}',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          CircleAvatar(
-                            backgroundColor: isMe ? kPurple : Colors.white12,
-                            child: Text(
-                              rows[i].key.isEmpty ? '?' : rows[i].key[0].toUpperCase(),
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                child: rows.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Hozircha reyting ma\'lumoti yo\'q',
+                          style: TextStyle(color: Colors.white54),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: rows.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (_, i) {
+                          final isMe = rows[i].key == Store.i.name;
+                          return card(
+                            Row(
                               children: [
-                                Text(
-                                  rows[i].key,
-                                  style: TextStyle(
-                                    fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
-                                    color: isMe ? kPurple : Colors.white,
+                                SizedBox(
+                                  width: 28,
+                                  child: Text(
+                                    i < 3 ? ['🥇', '🥈', '🥉'][i] : '${i + 1}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                CircleAvatar(
+                                  backgroundColor: isMe ? kPurple : Colors.white12,
+                                  child: Text(
+                                    rows[i].key.isEmpty ? '?' : rows[i].key[0].toUpperCase(),
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        rows[i].key,
+                                        style: TextStyle(
+                                          fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
+                                          color: isMe ? kPurple : Colors.white,
+                                        ),
+                                      ),
+                                      Text(
+                                        tierOf(rows[i].value),
+                                        style: TextStyle(fontSize: 10, color: tierColor(tierOf(rows[i].value))),
+                                      ),
+                                    ],
                                   ),
                                 ),
                                 Text(
-                                  tierOf(rows[i].value),
-                                  style: TextStyle(fontSize: 10, color: tierColor(tierOf(rows[i].value))),
+                                  '${rows[i].value} XP',
+                                  style: const TextStyle(color: kPurple, fontWeight: FontWeight.bold),
                                 ),
                               ],
                             ),
-                          ),
-                          Text(
-                            '${rows[i].value} XP',
-                            style: const TextStyle(color: kPurple, fontWeight: FontWeight.bold),
-                          ),
-                        ],
+                            border: isMe ? kPurple : null,
+                          );
+                        },
                       ),
-                      border: isMe ? kPurple : null,
-                    );
-                  },
-                ),
               ),
             ],
           ),

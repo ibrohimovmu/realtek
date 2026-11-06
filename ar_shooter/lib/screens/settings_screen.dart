@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/server_client.dart';
 import '../services/store.dart';
 import '../theme.dart';
 
@@ -12,6 +13,8 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _serverController = TextEditingController();
+  bool? _isServerOnline;
+  bool _isCheckingServer = false;
 
   @override
   void initState() {
@@ -23,6 +26,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void dispose() {
     _serverController.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkServer() async {
+    setState(() => _isCheckingServer = true);
+    final isUp = await ServerClient.i.checkHealth();
+    if (mounted) {
+      setState(() {
+        _isServerOnline = isUp;
+        _isCheckingServer = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isUp ? 'Server faol va ishlayapti (Online)!' : 'Server bilan aloqa yo\'q (Oflayn)',
+          ),
+          backgroundColor: isUp ? kGreen : kOrange,
+        ),
+      );
+    }
   }
 
   void _showRenameDialog() {
@@ -310,6 +332,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           },
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        FilledButton.tonal(
+                          onPressed: _isCheckingServer ? null : _checkServer,
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(120, 36),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: _isCheckingServer
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Text('Aloqani Tekshirish', style: TextStyle(fontSize: 11)),
+                        ),
+                        const SizedBox(width: 10),
+                        if (_isServerOnline != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: (_isServerOnline! ? kGreen : kOrange).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: _isServerOnline! ? kGreen : kOrange),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _isServerOnline! ? kGreen : kOrange,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _isServerOnline! ? 'Online' : 'Offline',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: _isServerOnline! ? kGreen : kOrange,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     Row(
