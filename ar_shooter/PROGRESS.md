@@ -114,11 +114,43 @@
    - `flutter analyze`: 0 xato, 0 ogohlantirish (`No issues found!`).
    - `flutter test`: Barcha 15 ta unit test 100% muvaffaqiyatli o'tdi.
 
-### 🔄 Jarayondagi ishlar (In Progress):
-- PHASE 4 kutmoqda: Ro'yxatdan o'tish, profil, yutuqlar (badges), darajalar va JSON export/import.
+## 📌 PHASE 4: Ro'yxatdan O'tish, Profil, Yutuqlar va Zaxira (Yakunlandi)
 
-### ⚠️ Ma'lum cheklovlar (Known Limits):
-- Giroskop bo'lmagan arzon qurilmalarda qurolning silkinishi akselerometr bilan zaxiralangan.
+### ✅ Amalga oshirilgan ishlar (Done):
+1. **Ko'p Bosqichli Onboarding Tizimi (`lib/screens/onboarding.dart`):**
+   - 5 bosqichli silliq PageView sehrgari (wizard):
+     - Bosqich 0: Jangovar taxallus (Callsign) — majburiy.
+     - Bosqich 1: Operator shakli (Alpha, Specter, Valkyrie, Ghost, Titan, Cyber).
+     - Bosqich 2: Hudud tanlash (O'zbekistonning barcha 13 ta viloyati va respublikasi).
+     - Bosqich 3: Jamoa taktik rangi (Ko'k, Qizil, Yashil, Sariq).
+     - Bosqich 4: Jangovar o'yin uslubi va sevimli qurol tanlovi.
+   - Bosqichlar progress nuqtalari bilan aks etadi; taxallusdan tashqari barcha bosqichlarni "O'tkazib yuborish" imkoni mavjud.
+2. **Yangi Harbiy Nishonlar va Yutuqlar Katalogi (`lib/data/achievements.dart`):**
+   - 10 ta maxsus yutuq modeli: `first_blood`, `marksman`, `reaper`, `silver_rank`, `gold_rank`, `diamond_rank`, `armorer`, `dedicated`, `bomb_expert`, `medic`.
+   - Har bir yutuq o'z nomi, tavsifi, ikonasi va o'ziga xos rangiga ega.
+3. **Mukammal Profil Ekranı (`lib/screens/profile_screen.dart`):**
+   - Operator shakli, taxallusi, hududi va o'yin uslubi aks etgan profil kartasi.
+   - Keyingi unvongacha bo'lgan tajriba (XP) progress indikatori (`LinearProgressIndicator`).
+   - 7 kunlik qatnov kalendari ("5 days straight" uslubida) va kunlik bonusni yig'ish mexanikasi.
+   - Ochilgan va qulflangan nishonlar ro'yxati (ochilganlari rangli, qulflanganlari xiralashtirilgan).
+   - Unvon oshganda (Rank-Up) chaqiladigan yorqin tabriklovchi modal oyna (`rankUpNotifier`).
+4. **Maxsus Sozlamalar Ekranı (`lib/screens/settings_screen.dart`):**
+   - Ovoz, vibratsiya, GPS va kompas almashish, taktik debug overlay o'chirib-yoqish.
+   - Nishon sezgirligi slayderi (0.5x dan 2.0x gacha).
+   - Taxallusni tahrirlash dialogi.
+   - Server URL manzilini sozlash (onlayn rejim uchun).
+   - O'zbekcha / Inglizcha til ko'rsatkichi.
+   - Qizil xavfli zona: butun taraqqiyotni nollash (tasdiqlash bilan).
+5. **Mahalliy Xotira Zaxirasi (JSON Export & Import):**
+   - `Store.exportToJson()`: Barcha qurollar, statistika, darajalar va sozlamalarni chiroyli formatlangan JSON matniga o'giradi va buferga nusxalaydi.
+   - `Store.importFromJson()`: Foydalanuvchi kiritgan JSON matnidan barcha yutuqlar va xotirani qayta tiklaydi; noto'g'ri formatlarni xatosiz ushlab qoladi.
+6. **Sifat nazorati va Testlar:**
+   - Yangi `test/progression_test.dart` yozildi (JSON export/import, rank-up triggers, streak cooldown, achievement catalog).
+   - `flutter test`: Barcha 22 ta unit test 100% muvaffaqiyatli o'tdi.
+   - `flutter analyze`: 0 xato, 0 ogohlantirish (`No issues found!`).
+
+### 🔄 Jarayondagi ishlar (In Progress):
+- PHASE 5 kutmoqda: Rock-solid local WiFi & Hotspot multiplayer (UDP discovery + TCP protocol robustness, host reconnect, kill toasts).
 
 ---
 
@@ -127,7 +159,7 @@
 - [x] PHASE 1: Real person detection + scope
 - [x] PHASE 2: Combined hit resolution (person + team color + GPS/compass)
 - [x] PHASE 3: Weapons, sound, bombs, loot
-- [ ] PHASE 4: Registration, profile, progression
+- [x] PHASE 4: Registration, profile, progression
 - [ ] PHASE 5: Rock-solid local multiplayer (WiFi LAN / hotspot)
 - [ ] PHASE 6: Polish pass 1
 - [ ] PHASE 7: Optional online server

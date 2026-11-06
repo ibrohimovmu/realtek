@@ -1,16 +1,148 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import '../data/achievements.dart';
 import '../services/store.dart';
 import '../theme.dart';
+import 'settings_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Store.i.rankUpNotifier.addListener(_onRankUp);
+  }
+
+  @override
+  void dispose() {
+    Store.i.rankUpNotifier.removeListener(_onRankUp);
+    super.dispose();
+  }
+
+  void _onRankUp() {
+    final newTier = Store.i.rankUpNotifier.value;
+    if (newTier != null && mounted) {
+      _showRankCelebration(newTier);
+    }
+  }
+
+  void _showRankCelebration(String tier) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: kCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: tierColor(tier).withValues(alpha: 0.2),
+                border: Border.all(color: tierColor(tier), width: 3),
+                boxShadow: [
+                  BoxShadow(color: tierColor(tier).withValues(alpha: 0.6), blurRadius: 24),
+                ],
+              ),
+              child: Icon(Icons.workspace_premium, size: 48, color: tierColor(tier)),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'YANGI DARAJA!',
+              style: TextStyle(color: kPurple, fontWeight: FontWeight.bold, letterSpacing: 1.5, fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              tier,
+              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: tierColor(tier)),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Tabriklaymiz, jangovar mahoratingiz yangi bosqichga ko\'tarildi! Barcha jamoadoshlar sizni yangi unvon bilan ko\'rishadi.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+          ],
+        ),
+        actions: [
+          Center(
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: tierColor(tier),
+                foregroundColor: Colors.black,
+                minimumSize: const Size(160, 46),
+              ),
+              onPressed: () {
+                Store.i.rankUpNotifier.value = null;
+                Navigator.pop(context);
+              },
+              child: const Text('Qabul Qilish', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _avatarIcon(String av) {
+    switch (av) {
+      case 'operator_1':
+        return Icons.security;
+      case 'operator_2':
+        return Icons.visibility;
+      case 'operator_3':
+        return Icons.flash_on;
+      case 'operator_4':
+        return Icons.radar;
+      case 'operator_5':
+        return Icons.shield;
+      case 'operator_6':
+        return Icons.memory;
+      default:
+        return Icons.person;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: Store.i,
-      builder: (_, __) {
+      builder: (context, _) {
         final s = Store.i;
+        final currentTier = tierOf(s.xp);
+        final color = tierColor(currentTier);
+
+        int nextThreshold = 500;
+        int prevThreshold = 0;
+        if (s.xp < 500) {
+          prevThreshold = 0;
+          nextThreshold = 500;
+        } else if (s.xp < 1500) {
+          prevThreshold = 500;
+          nextThreshold = 1500;
+        } else if (s.xp < 3500) {
+          prevThreshold = 1500;
+          nextThreshold = 3500;
+        } else if (s.xp < 6000) {
+          prevThreshold = 3500;
+          nextThreshold = 6000;
+        } else if (s.xp < 10000) {
+          prevThreshold = 6000;
+          nextThreshold = 10000;
+        } else {
+          prevThreshold = 10000;
+          nextThreshold = 20000;
+        }
+
+        final progress = ((s.xp - prevThreshold) / max(1, nextThreshold - prevThreshold)).clamp(0.0, 1.0);
 
         Widget stat(IconData i, String k, String v) => Expanded(
               child: card(
@@ -27,6 +159,7 @@ class ProfileScreen extends StatelessWidget {
             );
 
         return Scaffold(
+          backgroundColor: kBg,
           appBar: AppBar(
             backgroundColor: kBg,
             elevation: 0,
@@ -34,7 +167,13 @@ class ProfileScreen extends StatelessWidget {
             actions: [
               IconButton(
                 icon: const Icon(Icons.settings),
-                onPressed: () => _openSettings(context),
+                tooltip: 'Sozlamalar',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                },
               ),
             ],
           ),
@@ -46,42 +185,89 @@ class ProfileScreen extends StatelessWidget {
                 Column(
                   children: [
                     CircleAvatar(
-                      radius: 40,
-                      backgroundColor: kPurple,
-                      child: Text(
-                        s.name.isEmpty ? '?' : s.name[0].toUpperCase(),
-                        style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
+                      radius: 42,
+                      backgroundColor: kPurple.withValues(alpha: 0.2),
+                      child: Icon(_avatarIcon(s.avatar), size: 44, color: kPurple),
                     ),
                     const SizedBox(height: 10),
-                    Text(s.name, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: tierColor(tierOf(s.xp)).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: tierColor(tierOf(s.xp))),
-                      ),
-                      child: Text(
-                        '${tierOf(s.xp)} • LVL ${levelOf(s.xp)}',
-                        style: TextStyle(
-                          color: tierColor(tierOf(s.xp)),
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                    Text(
+                      s.name.isEmpty ? 'Noma\'lum Operator' : s.name,
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: color),
+                          ),
+                          child: Text(
+                            '$currentTier • LVL ${levelOf(s.xp)}',
+                            style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
                         ),
-                      ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white10,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            s.region,
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white10,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            s.playStyle,
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Rank Progress Bar
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Keyingi darajagacha:', style: TextStyle(color: Colors.white60, fontSize: 11)),
+                            Text('${s.xp} / $nextThreshold XP', style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11)),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: 8,
+                            backgroundColor: Colors.white12,
+                            valueColor: AlwaysStoppedAnimation(color),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 12),
 
-              // Daily Streak Box ("5 days straight" style)
+              // Daily Streak Card
               _buildDailyStreakCard(context, s),
               const SizedBox(height: 12),
 
-              // Combat Stats Grid
+              // Stats Grid
               Row(
                 children: [
                   stat(Icons.bolt, 'Tajriba (XP)', '${s.xp}'),
@@ -108,29 +294,6 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 8),
               _buildBadgesSection(s),
               const SizedBox(height: 20),
-
-              // Actions
-              OutlinedButton.icon(
-                onPressed: () => _rename(context),
-                icon: const Icon(Icons.edit, size: 18),
-                label: const Text('Taxallusni O\'zgartirish'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: () => _confirmReset(context),
-                icon: const Icon(Icons.delete_forever, size: 18, color: kRed),
-                label: const Text('Taraqqiyotni Qayta Tiklash (Reset)', style: TextStyle(color: kRed)),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: kRed),
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
-              const SizedBox(height: 16),
             ],
           ),
         );
@@ -214,49 +377,41 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildBadgesSection(Store s) {
-    final allBadges = [
-      {'id': 'first_blood', 'name': 'Birinchi Qon', 'desc': '1 ta dushmanni yo\'q qilish', 'icon': Icons.flash_on},
-      {'id': 'marksman', 'name': 'Mergon', 'desc': '10 ta dushman', 'icon': Icons.gps_fixed},
-      {'id': 'reaper', 'name': 'O\'lim Farishtasi', 'desc': '50 ta dushman', 'icon': Icons.warning},
-      {'id': 'silver_rank', 'name': 'Silver Jangchi', 'desc': '500 XP to\'plash', 'icon': Icons.military_tech},
-      {'id': 'gold_rank', 'name': 'Gold Veteran', 'desc': '1500 XP to\'plash', 'icon': Icons.emoji_events},
-      {'id': 'armorer', 'name': 'Arsenal Ustasi', 'desc': 'Kamida 3 ta qurolga ega bo\'lish', 'icon': Icons.inventory_2},
-      {'id': 'dedicated', 'name': 'Sodiq Jangchi', 'desc': '5 kun ketma-ket kirish', 'icon': Icons.local_fire_department},
-    ];
-
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: allBadges.map((b) {
-        final unlocked = s.badges.contains(b['id']);
+      children: kAchievements.map((ach) {
+        final unlocked = s.badges.contains(ach.id);
         return Container(
-          width: 165,
+          width: (MediaQuery.of(context).size.width - 48) / 2,
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: unlocked ? kPurple.withValues(alpha: 0.15) : Colors.black26,
+            color: unlocked ? ach.color.withValues(alpha: 0.15) : Colors.black26,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: unlocked ? kPurple : Colors.white10),
+            border: Border.all(color: unlocked ? ach.color : Colors.white10),
           ),
           child: Row(
             children: [
-              Icon(b['icon'] as IconData, color: unlocked ? kPurple : Colors.white30, size: 24),
+              Icon(ach.icon, color: unlocked ? ach.color : Colors.white30, size: 24),
               const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      b['name'] as String,
+                      ach.title,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 11,
                         color: unlocked ? Colors.white : Colors.white38,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      b['desc'] as String,
+                      ach.description,
                       style: const TextStyle(fontSize: 9, color: Colors.white54),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
@@ -266,167 +421,6 @@ class ProfileScreen extends StatelessWidget {
           ),
         );
       }).toList(),
-    );
-  }
-
-  void _rename(BuildContext context) {
-    final c = TextEditingController(text: Store.i.name);
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: kCard,
-        title: const Text('Taxallusni yangilash'),
-        content: TextField(
-          controller: c,
-          maxLength: 16,
-          decoration: const InputDecoration(hintText: 'Yangi taxallus'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Bekor qilish')),
-          FilledButton(
-            onPressed: () {
-              if (c.text.trim().isNotEmpty) {
-                Store.i.setName(c.text.trim());
-              }
-              Navigator.pop(context);
-            },
-            child: const Text('Saqlash'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _confirmReset(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: kCard,
-        title: const Text('Taraqqiyotni o\'chirish?'),
-        content: const Text('Barcha qurollar, tangalar, daraja va statistika qayta nollanadi. Bunga aminmisiz?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Bekor qilish')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: kRed),
-            onPressed: () {
-              Store.i.resetProgress();
-              Navigator.pop(context);
-            },
-            child: const Text('Ha, hammasini tozalash'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openSettings(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: kCard,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) {
-          final s = Store.i;
-          return Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('O\'yin Sozlamalari', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  activeThumbColor: kPurple,
-                  title: const Text('Ovoz effektlari (Audio)'),
-                  subtitle: const Text('Qurollar ovozi va nishonga tegish signallari'),
-                  value: s.soundEnabled,
-                  onChanged: (v) {
-                    s.setSettings(sound: v);
-                    setModalState(() {});
-                  },
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  activeThumbColor: kPurple,
-                  title: const Text('Vibratsiya & Haptics'),
-                  subtitle: const Text('O\'q otish va zarba tebranishi'),
-                  value: s.vibrationEnabled,
-                  onChanged: (v) {
-                    s.setSettings(vibration: v);
-                    setModalState(() {});
-                  },
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  activeThumbColor: kPurple,
-                  title: const Text('FPS & Aniqlash Ko\'rsatkichi (Debug)'),
-                  subtitle: const Text('Ekranda kamera tezligi va ML kechikishini ko\'rsatish'),
-                  value: s.debugOverlayEnabled,
-                  onChanged: (v) {
-                    s.toggleDebugOverlay();
-                    setModalState(() {});
-                  },
-                ),
-                const SizedBox(height: 12),
-                const Text('Jamoangiz (Team Color):', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    _teamChoiceChip(setModalState, 'blue', 'Ko\'k', const Color(0xFF228BE6)),
-                    const SizedBox(width: 8),
-                    _teamChoiceChip(setModalState, 'red', 'Qizil', const Color(0xFFFF2A4D)),
-                    const SizedBox(width: 8),
-                    _teamChoiceChip(setModalState, 'green', 'Yashil', const Color(0xFF2EE59D)),
-                    const SizedBox(width: 8),
-                    _teamChoiceChip(setModalState, 'yellow', 'Sariq', const Color(0xFFFFD43B)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text('Nishon sezuvchanligi: ${(s.sensitivity * 100).round()}%'),
-                Slider(
-                  activeColor: kPurple,
-                  value: s.sensitivity,
-                  min: 0.5,
-                  max: 2.0,
-                  divisions: 6,
-                  onChanged: (v) {
-                    s.setSettings(sens: v);
-                    setModalState(() {});
-                  },
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _teamChoiceChip(
-    StateSetter setModalState,
-    String teamId,
-    String label,
-    Color color,
-  ) {
-    final isSelected = Store.i.team == teamId;
-    return ChoiceChip(
-      label: Text(
-        label,
-        style: TextStyle(
-          color: isSelected ? Colors.black : Colors.white,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      selected: isSelected,
-      selectedColor: color,
-      backgroundColor: color.withValues(alpha: 0.15),
-      side: BorderSide(color: isSelected ? color : Colors.white24),
-      onSelected: (_) {
-        Store.i.setTeam(teamId);
-        setModalState(() {});
-      },
     );
   }
 }

@@ -1,14 +1,16 @@
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/weapons.dart';
+import '../theme.dart';
 import 'lan.dart';
 
 class Store extends ChangeNotifier {
   static final i = Store._();
   Store._();
 
-  static const int currentSchemaVersion = 2;
+  static const int currentSchemaVersion = 3;
   late SharedPreferences _p;
 
   String name = '';
@@ -24,12 +26,21 @@ class Store extends ChangeNotifier {
   int armor = 50; // 0 to 100%
   List<String> owned = ['pistol'];
 
+  // Profile Customization
+  String avatar = 'operator_1';
+  String region = 'Toshkent';
+  String playStyle = 'Hujumkor (Assault)';
+  String favoriteWeapon = 'm416';
+  String language = 'uz';
+
   // Settings
   bool soundEnabled = true;
   bool vibrationEnabled = true;
   double sensitivity = 1.0;
   bool safetyAccepted = false;
   bool debugOverlayEnabled = true;
+  bool gpsSharingEnabled = true;
+  String serverUrl = 'http://localhost:7860';
 
   // Daily Streak
   int dailyStreak = 1;
@@ -37,6 +48,9 @@ class Store extends ChangeNotifier {
 
   // Badges / Achievements
   List<String> badges = [];
+
+  // Rank-Up Notification Callback / ValueNotifier
+  final ValueNotifier<String?> rankUpNotifier = ValueNotifier<String?>(null);
 
   Future<void> load() async {
     _p = await SharedPreferences.getInstance();
@@ -60,11 +74,19 @@ class Store extends ChangeNotifier {
     armor = _p.getInt('armor') ?? 50;
     owned = _p.getStringList('owned') ?? ['pistol'];
 
+    avatar = _p.getString('avatar') ?? 'operator_1';
+    region = _p.getString('region') ?? 'Toshkent';
+    playStyle = _p.getString('play_style') ?? 'Hujumkor (Assault)';
+    favoriteWeapon = _p.getString('fav_weapon') ?? 'm416';
+    language = _p.getString('language') ?? 'uz';
+
     soundEnabled = _p.getBool('sound') ?? true;
     vibrationEnabled = _p.getBool('vibe') ?? true;
     sensitivity = _p.getDouble('sens') ?? 1.0;
     safetyAccepted = _p.getBool('safety_accepted') ?? false;
     debugOverlayEnabled = _p.getBool('debug_overlay') ?? true;
+    gpsSharingEnabled = _p.getBool('gps_sharing') ?? true;
+    serverUrl = _p.getString('server_url') ?? 'http://localhost:7860';
 
     dailyStreak = _p.getInt('daily_streak') ?? 1;
     lastDailyEpoch = _p.getInt('last_daily') ?? 0;
@@ -87,10 +109,18 @@ class Store extends ChangeNotifier {
     _p.setInt('armor', armor);
     _p.setStringList('owned', owned);
 
+    _p.setString('avatar', avatar);
+    _p.setString('region', region);
+    _p.setString('play_style', playStyle);
+    _p.setString('fav_weapon', favoriteWeapon);
+    _p.setString('language', language);
+
     _p.setBool('sound', soundEnabled);
     _p.setBool('vibe', vibrationEnabled);
     _p.setDouble('sens', sensitivity);
     _p.setBool('debug_overlay', debugOverlayEnabled);
+    _p.setBool('gps_sharing', gpsSharingEnabled);
+    _p.setString('server_url', serverUrl);
 
     _p.setInt('daily_streak', dailyStreak);
     _p.setInt('last_daily', lastDailyEpoch);
@@ -142,7 +172,12 @@ class Store extends ChangeNotifier {
   }
 
   void addXp(int x) {
+    final oldTier = tierOf(xp);
     xp += x;
+    final newTier = tierOf(xp);
+    if (oldTier != newTier) {
+      rankUpNotifier.value = newTier;
+    }
     checkBadges();
     save();
   }
@@ -375,11 +410,113 @@ class Store extends ChangeNotifier {
     deaths = 0;
     medkits = 1;
     bandages = 2;
+    grenades = 2;
     armor = 50;
     owned = ['pistol'];
+    avatar = 'operator_1';
+    region = 'Toshkent';
+    playStyle = 'Hujumkor (Assault)';
+    favoriteWeapon = 'm416';
     dailyStreak = 1;
     lastDailyEpoch = 0;
     badges.clear();
     save();
+  }
+
+  /// Exports player progress and settings into a formatted JSON string.
+  String exportToJson() {
+    final data = {
+      'schema_version': currentSchemaVersion,
+      'exported_at': DateTime.now().toIso8601String(),
+      'profile': {
+        'name': name,
+        'team': team,
+        'avatar': avatar,
+        'region': region,
+        'play_style': playStyle,
+        'fav_weapon': favoriteWeapon,
+        'language': language,
+      },
+      'stats': {
+        'xp': xp,
+        'coins': coins,
+        'kills': kills,
+        'deaths': deaths,
+        'medkits': medkits,
+        'bandages': bandages,
+        'grenades': grenades,
+        'armor': armor,
+        'equipped': equipped,
+        'owned': owned,
+        'daily_streak': dailyStreak,
+        'last_daily_epoch': lastDailyEpoch,
+        'badges': badges,
+      },
+      'settings': {
+        'sound_enabled': soundEnabled,
+        'vibration_enabled': vibrationEnabled,
+        'sensitivity': sensitivity,
+        'debug_overlay': debugOverlayEnabled,
+        'gps_sharing': gpsSharingEnabled,
+        'server_url': serverUrl,
+      },
+    };
+    return const JsonEncoder.withIndent('  ').convert(data);
+  }
+
+  /// Imports player progress and settings from a JSON string.
+  /// Returns true if successful, false if JSON is malformed or invalid.
+  bool importFromJson(String jsonStr) {
+    try {
+      final decoded = json.decode(jsonStr);
+      if (decoded is! Map<String, dynamic>) return false;
+
+      if (decoded.containsKey('profile') && decoded['profile'] is Map) {
+        final p = decoded['profile'] as Map<String, dynamic>;
+        name = p['name'] as String? ?? name;
+        team = p['team'] as String? ?? team;
+        avatar = p['avatar'] as String? ?? avatar;
+        region = p['region'] as String? ?? region;
+        playStyle = p['play_style'] as String? ?? playStyle;
+        favoriteWeapon = p['fav_weapon'] as String? ?? favoriteWeapon;
+        language = p['language'] as String? ?? language;
+      }
+
+      if (decoded.containsKey('stats') && decoded['stats'] is Map) {
+        final s = decoded['stats'] as Map<String, dynamic>;
+        xp = (s['xp'] as num?)?.toInt() ?? xp;
+        coins = (s['coins'] as num?)?.toInt() ?? coins;
+        kills = (s['kills'] as num?)?.toInt() ?? kills;
+        deaths = (s['deaths'] as num?)?.toInt() ?? deaths;
+        medkits = (s['medkits'] as num?)?.toInt() ?? medkits;
+        bandages = (s['bandages'] as num?)?.toInt() ?? bandages;
+        grenades = (s['grenades'] as num?)?.toInt() ?? grenades;
+        armor = (s['armor'] as num?)?.toInt() ?? armor;
+        equipped = s['equipped'] as String? ?? equipped;
+        if (s['owned'] is List) {
+          owned = List<String>.from(s['owned'] as List);
+        }
+        dailyStreak = (s['daily_streak'] as num?)?.toInt() ?? dailyStreak;
+        lastDailyEpoch = (s['last_daily_epoch'] as num?)?.toInt() ?? lastDailyEpoch;
+        if (s['badges'] is List) {
+          badges = List<String>.from(s['badges'] as List);
+        }
+      }
+
+      if (decoded.containsKey('settings') && decoded['settings'] is Map) {
+        final set = decoded['settings'] as Map<String, dynamic>;
+        soundEnabled = set['sound_enabled'] as bool? ?? soundEnabled;
+        vibrationEnabled = set['vibration_enabled'] as bool? ?? vibrationEnabled;
+        sensitivity = (set['sensitivity'] as num?)?.toDouble() ?? sensitivity;
+        debugOverlayEnabled = set['debug_overlay'] as bool? ?? debugOverlayEnabled;
+        gpsSharingEnabled = set['gps_sharing'] as bool? ?? gpsSharingEnabled;
+        serverUrl = set['server_url'] as String? ?? serverUrl;
+      }
+
+      save();
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 }
