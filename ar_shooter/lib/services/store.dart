@@ -46,8 +46,9 @@ class Store extends ChangeNotifier {
   int dailyStreak = 1;
   int lastDailyEpoch = 0;
 
-  // Badges / Achievements
+  // Badges / Achievements & Missions
   List<String> badges = [];
+  List<String> claimedMissions = [];
 
   // Rank-Up Notification Callback / ValueNotifier
   final ValueNotifier<String?> rankUpNotifier = ValueNotifier<String?>(null);
@@ -91,6 +92,7 @@ class Store extends ChangeNotifier {
     dailyStreak = _p.getInt('daily_streak') ?? 1;
     lastDailyEpoch = _p.getInt('last_daily') ?? 0;
     badges = _p.getStringList('badges') ?? [];
+    claimedMissions = _p.getStringList('claimed_missions') ?? [];
 
     checkBadges();
   }
@@ -125,6 +127,7 @@ class Store extends ChangeNotifier {
     _p.setInt('daily_streak', dailyStreak);
     _p.setInt('last_daily', lastDailyEpoch);
     _p.setStringList('badges', badges);
+    _p.setStringList('claimed_missions', claimedMissions);
 
     notifyListeners();
     Lan.i.push();
@@ -420,7 +423,17 @@ class Store extends ChangeNotifier {
     dailyStreak = 1;
     lastDailyEpoch = 0;
     badges.clear();
+    claimedMissions.clear();
     save();
+  }
+
+  bool claimMission(String missionId, int rewardedCoins, int rewardedXp) {
+    if (claimedMissions.contains(missionId)) return false;
+    claimedMissions.add(missionId);
+    coins += rewardedCoins;
+    addXp(rewardedXp);
+    save();
+    return true;
   }
 
   /// Exports player progress and settings into a formatted JSON string.
@@ -451,6 +464,7 @@ class Store extends ChangeNotifier {
         'daily_streak': dailyStreak,
         'last_daily_epoch': lastDailyEpoch,
         'badges': badges,
+        'claimed_missions': claimedMissions,
       },
       'settings': {
         'sound_enabled': soundEnabled,
@@ -500,6 +514,9 @@ class Store extends ChangeNotifier {
         lastDailyEpoch = (s['last_daily_epoch'] as num?)?.toInt() ?? lastDailyEpoch;
         if (s['badges'] is List) {
           badges = List<String>.from(s['badges'] as List);
+        }
+        if (s['claimed_missions'] is List) {
+          claimedMissions = List<String>.from(s['claimed_missions'] as List);
         }
       }
 

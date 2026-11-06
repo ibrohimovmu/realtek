@@ -175,8 +175,30 @@
    - `flutter test`: Barcha 24 ta unit test 100% muvaffaqiyatli o'tdi.
    - `flutter analyze`: 0 xato, 0 ogohlantirish (`No issues found!`).
 
+## 📌 PHASE 6: Dizayn Sayqallash, Vazifalar va Qurollar Taqqoslovi (Yakunlandi)
+
+### ✅ Amalga oshirilgan ishlar (Done):
+1. **Dizayn Tizimi va Elingo Dark/Purple UI:**
+   - Fon `#14141F`, kartochkalar `#1F1F2E`, asosiy rang `#6C47FF`, aksent to'q sariq `#FF8A00`, qizil xavf `#FF2A4D`, yashil muvaffaqiyat `#2EE59D`, sian krossxeyr `#22D3EE`.
+   - 16 px yumaloq burchakli kartalar, pill shaklidagi boshqaruv tugmalari, 8/12/16/24 oralig'i (spacing scale).
+2. **Peshqadamlar Jadvali va Top-3 Podium ([`leaderboard_screen.dart`](file:///D:/c2q/ar_shooter/lib/screens/leaderboard_screen.dart)):**
+   - Top-3 shohsupasi: 1-o'rin Oltin toji va kubogi, 2-o'rin Kumush, 3-o'rin Bronza podiumlari.
+   - Vaqt filtri chiplari: *"Haftalik"*, *"Oylik"*, *"Barcha vaqt"*.
+3. **Interaktiv Jangovar Vazifalar Tizimi ([`missions_screen.dart`](file:///D:/c2q/ar_shooter/lib/screens/missions_screen.dart)):**
+   - Kunlik va haftalik vazifalar (qatl qilish, tajriba to'plash, zirh va aslahalar ishlatish).
+   - Jonli foizli progress paneli (`LinearProgressIndicator`).
+   - "Mukofotni Olish" tugmasi: bajarilgan vazifalar uchun darhol tangalar va XP beradi; qayta olishdan himoyalangan (`claimedMissions`).
+4. **Qurollar Arsenalining Visual Taqqoslovchi Panellari ([`shop_screen.dart`](file:///D:/c2q/ar_shooter/lib/screens/shop_screen.dart)):**
+   - Har bir qurol uchun grafik parametrlar: Zarar (DMG), Otish Masofasi (Range), O'q Sig'imi (Mag), Barqarorlik (Stability/Recoil).
+   - Kamyoblik nishonlari (Common, Rare, Epic, Legendary).
+   - Qurolni xarid qilish va 1-bosishda "Tanlash" (Equip) boshqaruvi.
+5. **Sifat nazorati va Testlar:**
+   - `test/progression_test.dart` ga `claimMission` testlari qo'shildi.
+   - `flutter test`: Barcha 25 ta unit test 100% muvaffaqiyatli o'tdi.
+   - `flutter analyze`: 0 xato, 0 ogohlantirish (`No issues found!`).
+
 ### 🔄 Jarayondagi ishlar (In Progress):
-- PHASE 6 kutmoqda: Yakuniy sayqallash (Polish pass 1, UI transitions, confetti, sound balance).
+- PHASE 7 kutmoqda: Ixtiyoriy onlayn server (Optional online FastAPI server, stats sync, matchmaking).
 
 ---
 
@@ -187,6 +209,6 @@
 - [x] PHASE 3: Weapons, sound, bombs, loot
 - [x] PHASE 4: Registration, profile, progression
 - [x] PHASE 5: Rock-solid local multiplayer (WiFi LAN / hotspot)
-- [ ] PHASE 6: Polish pass 1
+- [x] PHASE 6: Polish pass 1
 - [ ] PHASE 7: Optional online server
 - [ ] PHASE 8: Quality and delivery

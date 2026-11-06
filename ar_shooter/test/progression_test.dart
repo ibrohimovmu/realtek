@@ -106,5 +106,22 @@ void main() {
       expect(ids.contains('marksman'), isTrue);
       expect(ids.contains('silver_rank'), isTrue);
     });
+
+    test('claimMission awards coins/xp and prevents duplicate claims', () {
+      final s = Store.i;
+      final startCoins = s.coins;
+      final startXp = s.xp;
+
+      final firstClaim = s.claimMission('d_kills_5', 100, 50);
+      expect(firstClaim, isTrue);
+      expect(s.coins, startCoins + 100);
+      expect(s.xp, startXp + 50);
+      expect(s.claimedMissions.contains('d_kills_5'), isTrue);
+
+      final secondClaim = s.claimMission('d_kills_5', 100, 50);
+      expect(secondClaim, isFalse);
+      expect(s.coins, startCoins + 100);
+      expect(s.xp, startXp + 50);
+    });
   });
 }

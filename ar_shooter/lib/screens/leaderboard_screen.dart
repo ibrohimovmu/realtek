@@ -11,6 +11,7 @@ class LeaderboardScreen extends StatefulWidget {
 
 class _LeaderboardScreenState extends State<LeaderboardScreen> {
   bool _wifi = false;
+  String _timeframe = 'all';
   final _ipController = TextEditingController();
   String _info = '';
 
@@ -107,6 +108,39 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   ],
                 ),
               ),
+
+              // Timeframe filter for Local Leaderboard
+              if (!_wifi)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Row(
+                    children: [
+                      ChoiceChip(
+                        label: const Text('Haftalik', style: TextStyle(fontSize: 11)),
+                        selected: _timeframe == 'weekly',
+                        onSelected: (val) {
+                          if (val) setState(() => _timeframe = 'weekly');
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('Oylik', style: TextStyle(fontSize: 11)),
+                        selected: _timeframe == 'monthly',
+                        onSelected: (val) {
+                          if (val) setState(() => _timeframe = 'monthly');
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('Barcha vaqt', style: TextStyle(fontSize: 11)),
+                        selected: _timeframe == 'all',
+                        onSelected: (val) {
+                          if (val) setState(() => _timeframe = 'all');
+                        },
+                      ),
+                    ],
+                  ),
+                ),
 
               // Wi-Fi Multiplayer Panel
               if (_wifi)
