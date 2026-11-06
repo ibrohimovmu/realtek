@@ -17,14 +17,36 @@ class RoomBeacon {
   final String roomName;
   final String hostIp;
   final int playerCount;
+  final String gameMode;
+  final String mapName;
   final DateTime lastSeen;
 
   RoomBeacon({
     required this.roomName,
     required this.hostIp,
     required this.playerCount,
+    this.gameMode = 'Team Deathmatch',
+    this.mapName = 'Taktik Arena',
     required this.lastSeen,
   });
+
+  Map<String, dynamic> toJson() => {
+        'type': 'beacon',
+        'name': roomName,
+        'ip': hostIp,
+        'count': playerCount,
+        'mode': gameMode,
+        'map': mapName,
+      };
+
+  factory RoomBeacon.fromJson(Map<String, dynamic> json, String fallbackIp) => RoomBeacon(
+        roomName: json['name']?.toString() ?? 'Xona',
+        hostIp: json['ip']?.toString() ?? fallbackIp,
+        playerCount: (json['count'] as num?)?.toInt() ?? 1,
+        gameMode: json['mode']?.toString() ?? 'Team Deathmatch',
+        mapName: json['map']?.toString() ?? 'Taktik Arena',
+        lastSeen: DateTime.now(),
+      );
 }
 
 class MatchRound {
@@ -61,12 +83,14 @@ class Lan {
   final killFeed = ValueNotifier<List<String>>([]);
   final matchRound = ValueNotifier<MatchRound?>(null);
   final bombState = ValueNotifier<BombState?>(null);
+  final hostDisconnectedNotifier = ValueNotifier<bool>(false);
   Function(int damage, String shooterName, String conf)? onDamageReceived;
   final Map<String, int> _lastPlayerShotTs = {};
 
   // Host state
   ServerSocket? _srv;
   final Map<Socket, DateTime> _clientHeartbeats = {};
+  final Map<Socket, String> _socketToPlayer = {};
   Timer? _hostBeaconTimer;
   Timer? _hostHeartbeatCheckTimer;
   Timer? _hostBombTimer;
@@ -131,9 +155,7 @@ class Lan {
             final data = jsonDecode(msg) as Map<String, dynamic>;
             if (data['type'] == 'beacon') {
               _onBeaconReceived(
-                data['name']?.toString() ?? 'Xona',
-                data['ip']?.toString() ?? dg.address.address,
-                (data['count'] as num?)?.toInt() ?? 1,
+                RoomBeacon.fromJson(data, dg.address.address),
               );
             }
           } catch (_) {}
@@ -149,15 +171,9 @@ class Lan {
     } catch (_) {}
   }
 
-  void _onBeaconReceived(String name, String ip, int count) {
+  void _onBeaconReceived(RoomBeacon beacon) {
     final current = List<RoomBeacon>.from(discoveredRooms.value);
-    final idx = current.indexWhere((r) => r.hostIp == ip);
-    final beacon = RoomBeacon(
-      roomName: name,
-      hostIp: ip,
-      playerCount: count,
-      lastSeen: DateTime.now(),
-    );
+    final idx = current.indexWhere((r) => r.hostIp == beacon.hostIp);
     if (idx >= 0) {
       current[idx] = beacon;
     } else {
@@ -176,10 +192,15 @@ class Lan {
 
   // --- Host Implementation ---
 
-  Future<String> host({String? roomName}) async {
+  Future<String> host({
+    String? roomName,
+    String gameMode = 'Team Deathmatch',
+    String mapName = 'Taktik Arena',
+  }) async {
     stop();
     _srv = await ServerSocket.bind(InternetAddress.anyIPv4, tcpPort);
     status.value = ConnectionStatus.connected;
+    hostDisconnectedNotifier.value = false;
 
     // Register host player
     _merge(_me());
@@ -197,21 +218,37 @@ class Lan {
     final effectiveIp = hostIps.isNotEmpty ? hostIps.first : '127.0.0.1';
     final name = roomName ?? '${Store.i.name}\'s Room';
 
+    // Calculate subnet broadcast (e.g. 192.168.43.255 for hotspot)
+    InternetAddress? subnetBroadcast;
+    try {
+      final parts = effectiveIp.split('.');
+      if (parts.length == 4) {
+        subnetBroadcast = InternetAddress('${parts[0]}.${parts[1]}.${parts[2]}.255');
+      }
+    } catch (_) {}
+
     try {
       _hostUdpSocket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
       _hostUdpSocket!.broadcastEnabled = true;
 
       _hostBeaconTimer = Timer.periodic(const Duration(seconds: 2), (_) {
         if (_hostUdpSocket == null) return;
-        final beaconPayload = jsonEncode({
-          'type': 'beacon',
-          'name': name,
-          'ip': effectiveIp,
-          'count': players.value.length,
-        });
-        final bytes = utf8.encode(beaconPayload);
+        final beacon = RoomBeacon(
+          roomName: name,
+          hostIp: effectiveIp,
+          playerCount: players.value.length,
+          gameMode: gameMode,
+          mapName: mapName,
+          lastSeen: DateTime.now(),
+        );
+        final bytes = utf8.encode(jsonEncode(beacon.toJson()));
         try {
+          // Broadcast to global address
           _hostUdpSocket!.send(bytes, InternetAddress('255.255.255.255'), udpBeaconPort);
+          // Also broadcast to hotspot subnet if available
+          if (subnetBroadcast != null) {
+            _hostUdpSocket!.send(bytes, subnetBroadcast, udpBeaconPort);
+          }
         } catch (_) {}
       });
     } catch (_) {}
@@ -226,8 +263,7 @@ class Lan {
         }
       });
       for (final sock in toRemove) {
-        _clientHeartbeats.remove(sock);
-        sock.destroy();
+        _removeClientSocket(sock);
       }
       if (toRemove.isNotEmpty) {
         _broadcast();
@@ -235,6 +271,19 @@ class Lan {
     });
 
     return effectiveIp;
+  }
+
+  void _removeClientSocket(Socket sock) {
+    _clientHeartbeats.remove(sock);
+    final pName = _socketToPlayer.remove(sock);
+    if (pName != null) {
+      final current = Map<String, Map<String, dynamic>>.from(players.value);
+      current.remove(pName);
+      players.value = current;
+    }
+    try {
+      sock.destroy();
+    } catch (_) {}
   }
 
   void _handleHostMessage(Socket sender, Map m) {
@@ -267,11 +316,22 @@ class Lan {
 
     if (type == 'join') {
       String playerName = m['n']?.toString() ?? 'Player';
-      playerName = ensureUniquePlayerName(playerName, players.value.keys);
-      m['n'] = playerName;
+      final uniqueName = ensureUniquePlayerName(playerName, players.value.keys);
+      if (uniqueName != playerName) {
+        m['n'] = uniqueName;
+        // Notify client of assigned unique name
+        sender.write('${jsonEncode({'type': 'name_assigned', 'name': uniqueName})}\n');
+      }
+      _socketToPlayer[sender] = uniqueName;
       _merge(m);
       _broadcast();
       return;
+    }
+
+    // Associate player name with this socket
+    final pName = m['n']?.toString();
+    if (pName != null && pName.isNotEmpty) {
+      _socketToPlayer[sender] = pName;
     }
 
     // Default player update
@@ -498,6 +558,14 @@ class Lan {
 
     if (type == 'pong') return;
 
+    if (type == 'name_assigned') {
+      final assigned = m['name']?.toString();
+      if (assigned != null && assigned.isNotEmpty) {
+        Store.i.setName(assigned);
+      }
+      return;
+    }
+
     if (type == 'host_leave') {
       _onHostDisconnected();
       return;
@@ -548,6 +616,8 @@ class Lan {
     _up = null;
     status.value = ConnectionStatus.offline;
     players.value = {};
+    matchRound.value = null;
+    hostDisconnectedNotifier.value = true;
     _tryReconnect();
   }
 
@@ -652,6 +722,7 @@ class Lan {
       s.destroy();
     }
     _clientHeartbeats.clear();
+    _socketToPlayer.clear();
 
     players.value = {};
     matchRound.value = null;
@@ -711,12 +782,20 @@ class Lan {
             } catch (_) {}
           },
           onError: (_) {
-            _clientHeartbeats.remove(s);
-            if (!isHost) _onHostDisconnected();
+            if (isHost) {
+              _removeClientSocket(s);
+              _broadcast();
+            } else {
+              _onHostDisconnected();
+            }
           },
           onDone: () {
-            _clientHeartbeats.remove(s);
-            if (!isHost) _onHostDisconnected();
+            if (isHost) {
+              _removeClientSocket(s);
+              _broadcast();
+            } else {
+              _onHostDisconnected();
+            }
           },
         );
   }

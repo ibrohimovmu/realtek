@@ -149,8 +149,34 @@
    - `flutter test`: Barcha 22 ta unit test 100% muvaffaqiyatli o'tdi.
    - `flutter analyze`: 0 xato, 0 ogohlantirish (`No issues found!`).
 
+## 📌 PHASE 5: Mustahkam Lokal (WiFi & Hotspot) Multiplayer (Yakunlandi)
+
+### ✅ Amalga oshirilgan ishlar (Done):
+1. **UDP Xona Avto-Qidiruvi (Auto-Discovery Beacons):**
+   - Xost har 2 soniyada UDP 4041 port orqali xona ma'lumotlarini (`RoomBeacon`: xona nomi, host IP, o'yinchilar soni, rejim `Team Deathmatch`, xarita `Taktik Arena`) efirga uzatadi.
+   - Android Hotspot (nuqta ulashish) holatida global `255.255.255.255` bilan bir qatorda hotspot tarmog'ining ichki broadcast manziliga (masalan `192.168.43.255`) ham paket uzatiladi.
+   - Klientlar 1 bosishda yaqin atrofdagi xonalarni ko'radi va ulanadi; qo'lda IP kiritish imkoniyati zaxirada saqlangan.
+2. **Mustahkam TCP Protokoli va Avtomatik Tozalash:**
+   - 4040 portida qatorma-qator (newline-delimited) JSON almashinuvi, har bir paket 4 KB hajm bilan cheklangan.
+   - Har 3 soniyada `ping`/`pong` signallari, 10 soniyadan ortiq jim qolgan o'yinchilarni avtomatik o'chirish.
+   - Soket va o'yinchi bog'lanishi (`_socketToPlayer`): o'yinchi tarmoqdan uzilishi bilan uning ismi xonadan va peshqadamlar jadvalidan darhol o'chiriladi va barcha ishtirokchilarga sinxronlanadi.
+3. **Takroriy Taxalluslar Oldini Olish (Duplicate Nickname Prevention):**
+   - Agar xonada "Ali" bo'lsa va yana bitta "Ali" qo'shilsa, unga avtomatik "Ali#2" beriladi va uning o'z ilovasiga `name_assigned` orqali yangi taxallus yuboriladi.
+4. **Host Uzilishi Boshqaruvi (Host Departure Handling):**
+   - Xost chiqqanda `host_leave` paketi tarqatiladi.
+   - Klientlarda `hostDisconnectedNotifier` faollashib, ekranda qizil taktik ogohlantirish ko'rsatiladi va xatosiz lokal rejimga qaytariladi.
+5. **Jonli O'yin Hodisalari va Team Deathmatch (TDM):**
+   - Xost boshqargan 3-daqiqalik sinxron raund taymeri (`TDM: 180s`).
+   - Raund tugaganda g'olib va mag'lub jamoalar hisoblanadi (Ko'k vs Qizil); g'olib o'yinchilarga **+100 Tanga va +50 XP** yutuq beriladi va neon modal oyna ochiladi.
+   - Jonli hisoblar jadvali (Scoreboard): HUD-dagi TDM tugmasi yoki reyting tugmasi orqali jamoalar ochkolari, o'yinchilar jonli HP va qatllar sonini ko'rish mumkin.
+   - Sci-Fi Kill Feed Toasts: PUBG uslubidagi `[🎯 Ali] ➔ [Vali]` krossxeyrli taktik bildirishnomalar.
+6. **Sifat nazorati va Testlar:**
+   - `test/lan_test.dart` kengaytirildi (`RoomBeacon` JSON serializatsiya/deserializatsiyasi, `MatchRound` qolgan vaqt va yakunlanish hisobi, takroriy nomlar).
+   - `flutter test`: Barcha 24 ta unit test 100% muvaffaqiyatli o'tdi.
+   - `flutter analyze`: 0 xato, 0 ogohlantirish (`No issues found!`).
+
 ### 🔄 Jarayondagi ishlar (In Progress):
-- PHASE 5 kutmoqda: Rock-solid local WiFi & Hotspot multiplayer (UDP discovery + TCP protocol robustness, host reconnect, kill toasts).
+- PHASE 6 kutmoqda: Yakuniy sayqallash (Polish pass 1, UI transitions, confetti, sound balance).
 
 ---
 
@@ -160,7 +186,7 @@
 - [x] PHASE 2: Combined hit resolution (person + team color + GPS/compass)
 - [x] PHASE 3: Weapons, sound, bombs, loot
 - [x] PHASE 4: Registration, profile, progression
-- [ ] PHASE 5: Rock-solid local multiplayer (WiFi LAN / hotspot)
+- [x] PHASE 5: Rock-solid local multiplayer (WiFi LAN / hotspot)
 - [ ] PHASE 6: Polish pass 1
 - [ ] PHASE 7: Optional online server
 - [ ] PHASE 8: Quality and delivery

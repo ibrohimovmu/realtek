@@ -26,13 +26,28 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   void initState() {
     super.initState();
     Lan.i.startDiscoveryListener();
+    Lan.i.hostDisconnectedNotifier.addListener(_onHostDisconnected);
   }
 
   @override
   void dispose() {
+    Lan.i.hostDisconnectedNotifier.removeListener(_onHostDisconnected);
     Lan.i.stopDiscoveryListener();
     _ipController.dispose();
     super.dispose();
+  }
+
+  void _onHostDisconnected() {
+    if (Lan.i.hostDisconnectedNotifier.value && mounted) {
+      Lan.i.hostDisconnectedNotifier.value = false;
+      setState(() => _info = 'Host uzildi! Lokal reytingga qaytildi.');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Host uzildi! Lokal reytingga qaytildi.'),
+          backgroundColor: kRed,
+        ),
+      );
+    }
   }
 
   Future<void> _runAction(Future<void> Function() f) async {
@@ -146,7 +161,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                                 child: ListTile(
                                   dense: true,
                                   title: Text(room.roomName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Text('${room.hostIp} • ${room.playerCount} o\'yinchi'),
+                                  subtitle: Text('${room.hostIp} • ${room.playerCount} o\'yinchi • ${room.gameMode}'),
                                   trailing: FilledButton(
                                     onPressed: () => _runAction(() async {
                                       await Lan.i.join(room.hostIp);

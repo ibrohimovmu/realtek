@@ -47,6 +47,7 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
   Timer? _spawnTimer;
   Timer? _attackTimer;
   Timer? _roundTickTimer;
+  bool _roundFinishedHandled = false;
   final Random _r = Random();
 
   // Target State
@@ -117,7 +118,18 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
       }
     });
 
+    lan.hostDisconnectedNotifier.addListener(_onHostDisconnectedFromHud);
+
     _roundTickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final round = lan.matchRound.value;
+      if (round != null && round.active) {
+        if (round.isFinished && !_roundFinishedHandled) {
+          _roundFinishedHandled = true;
+          _onRoundFinished(round);
+        } else if (!round.isFinished) {
+          _roundFinishedHandled = false;
+        }
+      }
       if (mounted) setState(() {});
     });
   }
@@ -566,6 +578,209 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
       );
   }
 
+  void _onHostDisconnectedFromHud() {
+    if (lan.hostDisconnectedNotifier.value && mounted) {
+      lan.hostDisconnectedNotifier.value = false;
+      _toast('Host o\'yinni tark etdi! Xona yopildi.');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Host o\'yinni tark etdi! Xona yopildi.'),
+          backgroundColor: kRed,
+        ),
+      );
+    }
+  }
+
+  void _onRoundFinished(MatchRound round) {
+    int blueKills = 0;
+    int redKills = 0;
+    for (final p in lan.players.value.values) {
+      final team = p['team']?.toString();
+      final k = (p['k'] as num?)?.toInt() ?? 0;
+      if (team == 'blue') blueKills += k;
+      if (team == 'red') redKills += k;
+    }
+
+    final myTeam = s.team;
+    final isWinner = (myTeam == 'blue' && blueKills >= redKills) ||
+        (myTeam == 'red' && redKills >= blueKills) ||
+        lan.players.value.length <= 1;
+
+    if (isWinner) {
+      s.addCoins(100);
+      s.addXp(50);
+      _toast("G'ALABA! +100 Tanga va +50 XP qo'shildi!");
+      _playSound('audio/pickup.wav');
+    } else {
+      _toast("Raund yakunlandi! Mag'lubiyat.");
+    }
+
+    _showRoundResultDialog(isWinner, blueKills, redKills);
+  }
+
+  void _showRoundResultDialog(bool isWinner, int blueKills, int redKills) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        backgroundColor: kCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: (isWinner ? kGreen : kRed).withValues(alpha: 0.2),
+                border: Border.all(color: isWinner ? kGreen : kRed, width: 2),
+                boxShadow: [
+                  BoxShadow(color: (isWinner ? kGreen : kRed).withValues(alpha: 0.5), blurRadius: 16),
+                ],
+              ),
+              child: Icon(
+                isWinner ? Icons.emoji_events : Icons.sentiment_dissatisfied,
+                size: 40,
+                color: isWinner ? kGreen : kRed,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isWinner ? "G'ALABA!" : "MAG'LUBIYAT",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: isWinner ? kGreen : kRed,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              '3-daqiqalik Team Deathmatch yakunlandi.',
+              style: TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black38,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  Text("Ko'k: $blueKills", style: const TextStyle(color: Color(0xFF228BE6), fontWeight: FontWeight.bold)),
+                  const Text('VS', style: TextStyle(color: Colors.white38, fontSize: 11)),
+                  Text("Qizil: $redKills", style: const TextStyle(color: kRed, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+            if (isWinner) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: kOrange.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: kOrange),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.monetization_on, color: kOrange, size: 16),
+                    SizedBox(width: 4),
+                    Text('+100 Tanga Mukofoti', style: TextStyle(color: kOrange, fontWeight: FontWeight.bold, fontSize: 12)),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          Center(
+            child: FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Tushunarli'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLiveScoreboard() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: kCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.leaderboard, color: kPurple),
+            SizedBox(width: 8),
+            Text('Jonli Natijalar (Scoreboard)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: lan.players.value.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text('Xonada boshqa o\'yinchilar yo\'q', style: TextStyle(color: Colors.white54)),
+                )
+              : ListView(
+                  shrinkWrap: true,
+                  children: lan.players.value.values.map((p) {
+                    final name = p['n']?.toString() ?? 'Player';
+                    final kills = (p['k'] as num?)?.toInt() ?? 0;
+                    final hp = (p['hp'] as num?)?.toInt() ?? 100;
+                    final team = p['team']?.toString() ?? 'blue';
+                    final teamCol = team == 'red' ? kRed : (team == 'green' ? kGreen : const Color(0xFF228BE6));
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: teamCol.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: teamCol.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(color: teamCol, shape: BoxShape.circle),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              name,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                          ),
+                          Text('HP: $hp%', style: const TextStyle(fontSize: 11, color: Colors.white60)),
+                          const SizedBox(width: 12),
+                          Text(
+                            '$kills Qatl',
+                            style: const TextStyle(color: kOrange, fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Yopish'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _spawnTimer?.cancel();
@@ -575,6 +790,7 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
     _grenadeTimer?.cancel();
     _gyroSub?.cancel();
     _bombBeepTimer?.cancel();
+    lan.hostDisconnectedNotifier.removeListener(_onHostDisconnectedFromHud);
     SensorsService.i.stopTracking();
     lan.onDamageReceived = null;
     _cam?.stopImageStream().catchError((_) {});
@@ -1156,21 +1372,34 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
             ),
           ),
           if (round != null && round.active) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: kOrange.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: kOrange),
-              ),
-              child: Text(
-                'TDM: ${round.remainingSeconds}s',
-                style: GoogleFonts.robotoMono(
-                  color: kOrange,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 11,
+            InkWell(
+              onTap: _showLiveScoreboard,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: kOrange.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: kOrange),
+                ),
+                child: Text(
+                  'TDM: ${round.remainingSeconds}s',
+                  style: GoogleFonts.robotoMono(
+                    color: kOrange,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                  ),
                 ),
               ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          if (lan.active) ...[
+            IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              icon: const Icon(Icons.leaderboard, size: 16, color: kPurple),
+              tooltip: 'Jonli Hisob',
+              onPressed: _showLiveScoreboard,
             ),
             const SizedBox(width: 8),
           ],
@@ -1228,17 +1457,39 @@ class _HudScreenState extends State<HudScreen> with SingleTickerProviderStateMix
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: list.map((item) {
+        final parts = item.split(' ➔ ');
+        final killer = parts.isNotEmpty ? parts[0] : item;
+        final victim = parts.length > 1 ? parts[1] : '';
+
         return Container(
           margin: const EdgeInsets.only(bottom: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.65),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: Colors.white10),
+            color: Colors.black.withValues(alpha: 0.75),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: kPurple.withValues(alpha: 0.4)),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 4),
+            ],
           ),
-          child: Text(
-            item,
-            style: GoogleFonts.robotoMono(color: Colors.white, fontSize: 11),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.gps_fixed, size: 11, color: kOrange),
+              const SizedBox(width: 4),
+              Text(
+                killer,
+                style: GoogleFonts.robotoMono(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Text('➔', style: TextStyle(color: kRed, fontSize: 11)),
+              ),
+              Text(
+                victim,
+                style: GoogleFonts.robotoMono(color: Colors.white70, fontSize: 11),
+              ),
+            ],
           ),
         );
       }).toList(),
