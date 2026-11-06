@@ -9,15 +9,23 @@ const kRed = Color(0xFFFF2A4D);
 const kGreen = Color(0xFF00E676);
 const kCyan = Color(0xFF00E5FF);
 
-ThemeData appTheme() => ThemeData(
-      brightness: Brightness.dark,
-      scaffoldBackgroundColor: kBg,
-      colorScheme: const ColorScheme.dark(
-        primary: kPurple,
-        surface: kCard,
-        error: kRed,
-      ),
-      textTheme: GoogleFonts.nunitoTextTheme(ThemeData.dark().textTheme),
+ThemeData appTheme() {
+  TextTheme baseTextTheme = ThemeData.dark().textTheme;
+  try {
+    baseTextTheme = GoogleFonts.nunitoTextTheme(baseTextTheme);
+  } catch (_) {
+    // Fallback to default sans-serif font if offline
+  }
+
+  return ThemeData(
+    brightness: Brightness.dark,
+    scaffoldBackgroundColor: kBg,
+    colorScheme: const ColorScheme.dark(
+      primary: kPurple,
+      surface: kCard,
+      error: kRed,
+    ),
+    textTheme: baseTextTheme,
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: kCard,
@@ -48,6 +56,7 @@ ThemeData appTheme() => ThemeData(
         labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
       ),
     );
+}
 
 String tierOf(int xp) {
   if (xp < 500) return 'BRONZE';

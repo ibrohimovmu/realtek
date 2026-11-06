@@ -9,8 +9,27 @@ import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  await Store.i.load();
+  
+  // Safe orientation lock
+  try {
+    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  } catch (e) {
+    debugPrint('Orientation lock error: $e');
+  }
+
+  // Safe global error handler to prevent hard crashes
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('Flutter Error: ${details.exception}');
+  };
+
+  // Safe persistence load
+  try {
+    await Store.i.load();
+  } catch (e) {
+    debugPrint('Store load fallback error: $e');
+  }
+
   runApp(const App());
 }
 
