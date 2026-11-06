@@ -1,0 +1,90 @@
+name: Build Minimal Launcher APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-launcher:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: false
+
+      - name: Get Dependencies
+        working-directory: minimal_launcher
+        run: flutter pub get
+
+      - name: Run Flutter Analyze
+        working-directory: minimal_launcher
+        run: flutter analyze
+
+      - name: Run Unit Tests
+        working-directory: minimal_launcher
+        run: flutter test
+
+      - name: Build Universal Release APK
+        working-directory: minimal_launcher
+        run: flutter build apk --release
+
+      - name: Copy Universal APK
+        run: |
+          mkdir -p output_launcher_apks
+          cp minimal_launcher/build/app/outputs/flutter-apk/app-release.apk output_launcher_apks/MinimalLauncher-Universal.apk
+
+      - name: Build Split per ABI APKs
+        working-directory: minimal_launcher
+        run: flutter build apk --split-per-abi --release
+
+      - name: Copy Split APKs
+        run: |
+          cp minimal_launcher/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk output_launcher_apks/MinimalLauncher-arm64.apk || true
+          cp minimal_launcher/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk output_launcher_apks/MinimalLauncher-armeabi.apk || true
+          ls -lh output_launcher_apks
+
+      - name: Upload APK Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MinimalLauncher-APKs
+          path: output_launcher_apks/*.apk
+          retention-days: 14
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: launcher-v1.0.0
+          name: "Minimal Launcher v1.0.0 (Aesthetic & Interactive)"
+          body: |
+            ## 📱 Minimal Launcher — Android Home Launcher
+
+            Foydalanuvchi iltimosiga asosan Niagara Launcher zaifliklari bartaraf etilgan, estetik minimalist va jonli animatsiyalarga boy yangi launcher.
+
+            ### ✨ Asosiy imkoniyatlar:
+            - **Estetik Minimalist Dizayn:** Chiroyli adaçayı kulrang (`#AFBABA`) fon, katta raqamli soat, gorizontal haftalik lenta va qora doira shaklidagi ilova piktogrammalari.
+            - **Interaktiv Qora Mushuk:** O'ng chekkada mo'ralab turadigan, ko'zlarini miltillatuvchi, barmoq teginishiga qarab qaraydigan va teginilganda yashirinuvchi yoqimli mushukcha animatsiyasi.
+            - **Atrof-muhit Zarrachalari:** Sekin suzuvchi chang motlari va barmoq tekkan joyda yumshoq to'lqinlar.
+            - **Erkin Qidiruv (Niagara kamchiligi yo'q):** Qat'iy alifbo qatori o'rniga qulay qidiruv paneli va tezkor ilovalar tortmasi (harf boshlari va so'zlar bo'yicha qidiruv).
+            - **To'liq Mahalliy & Xavfsiz:** Hech qanday og'ir kutubxonalarsiz, toza Android `PackageManager` va Flutter orqali chaqmoqdek tez ochiladi va qotmaydi.
+          files: output_launcher_apks/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
