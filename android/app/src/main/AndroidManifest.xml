@@ -59,11 +59,13 @@
         android:hardwareAccelerated="true"
         android:theme="@style/AppTheme">
 
-        <!-- Main Zero-UI Activity (Works over Lock Screen + Voice Assist Intent) -->
+        <!-- Main Translucent Compact Overlay Activity (Works over Launcher & Lock Screen) -->
         <activity
             android:name=".MainActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:exported="true"
-            android:launchMode="singleTask"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="false"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|uiMode"
             android:showWhenLocked="true"
             android:turnScreenOn="true"

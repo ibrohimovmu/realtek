@@ -18,9 +18,8 @@ import androidx.core.content.ContextCompat;
 import org.json.JSONObject;
 
 /**
- * Native Java <-> Zero-UI JavaScript Bridge (window.NovaNative).
- * Connects the WebGL/Canvas Orb, Semantic VAD, Voice Biometrics, Relationship Matrix,
- * Telegram Plus Twin, and Focus/Prayer Scheduler directly to Android OS APIs.
+ * Native Java <-> Translucent Compact Overlay JavaScript Bridge (window.NovaNative).
+ * Connects Bixby Mini Card & Gemini Live Edge Glow directly to Android OS APIs.
  */
 public class NovaBridge {
 
@@ -30,6 +29,36 @@ public class NovaBridge {
     public NovaBridge(MainActivity activity) {
         this.activity = activity;
         this.vault = NovaMemoryVault.getInstance(activity);
+    }
+
+    // ========================================================================
+    // 0. OVERLAY DISMISS & NATIVE SPEECH RECOGNIZER (3.5s Pause Patience)
+    // ========================================================================
+    @JavascriptInterface
+    public void hideOverlay() {
+        activity.hideOverlay();
+    }
+
+    @JavascriptInterface
+    public void startNativeStt(String lang, int pauseMs) {
+        if (!activity.hasMic()) {
+            activity.requestMicPermission();
+            return;
+        }
+        MainActivity.setMicClaimedByWebView(true);
+        activity.getSpeechSession().start(lang, pauseMs);
+    }
+
+    @JavascriptInterface
+    public void stopNativeStt() {
+        activity.getSpeechSession().stop();
+        MainActivity.setMicClaimedByWebView(false);
+    }
+
+    @JavascriptInterface
+    public void cancelNativeStt() {
+        activity.getSpeechSession().cancel();
+        MainActivity.setMicClaimedByWebView(false);
     }
 
     // ========================================================================
@@ -84,18 +113,34 @@ public class NovaBridge {
     }
 
     @JavascriptInterface
+    public String getPermissionsStatus() {
+        return getPermissionsStatusJson();
+    }
+
+    @JavascriptInterface
+    public void openPermissionSettings(String permType) {
+        requestPermissionByName(permType);
+    }
+
+    @JavascriptInterface
     public void requestPermissionByName(String permType) {
         if (permType == null) return;
         activity.runOnUiThread(() -> {
             try {
                 switch (permType) {
                     case "microphone":
+                    case "mic":
+                        activity.requestMicPermission();
+                        break;
                     case "phoneCalls":
+                    case "phone":
                     case "contacts":
                     case "all_runtime":
-                        activity.requestAllRuntimePermissions();
+                    case "runtime":
+                        activity.requestPhonePermissions();
                         break;
                     case "usageStats":
+                    case "usage":
                         Intent usageIntent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
                         usageIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                         activity.startActivity(usageIntent);
@@ -116,6 +161,7 @@ public class NovaBridge {
                         activity.startActivity(accIntent);
                         break;
                     case "notificationListener":
+                    case "notification":
                         Intent nlIntent = new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
                         nlIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                         activity.startActivity(nlIntent);
@@ -143,115 +189,12 @@ public class NovaBridge {
                     case "rootAvailable":
                         RootExecutor.runRootCommand("id");
                         break;
-                    case "notification":
-                        Intent nlIntent2 = new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
-                        nlIntent2.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        activity.startActivity(nlIntent2);
-                        break;
-                    case "usage":
-                        Intent uIntent2 = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
-                        uIntent2.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        activity.startActivity(uIntent2);
-                        break;
-                    case "runtime":
-                        activity.requestAllRuntimePermissions();
+                    default:
+                        activity.openAppDetails();
                         break;
                 }
             } catch (Throwable ignored) {}
         });
-    }
-
-    // Alias methods for JS modules
-    @JavascriptInterface
-    public String getPermissionsStatus() {
-        return getPermissionsStatusJson();
-    }
-
-    @JavascriptInterface
-    public void openPermissionSettings(String action) {
-        requestPermissionByName(action);
-    }
-
-    @JavascriptInterface
-    public String vaultGet(String key, String defaultVal) {
-        return vault.getMemory(key, defaultVal);
-    }
-
-    @JavascriptInterface
-    public void vaultSet(String key, String value) {
-        vault.setMemory(key, value);
-    }
-
-    @JavascriptInterface
-    public String getRelationshipMatrix() {
-        return vault.getRelationshipMatrixJson();
-    }
-
-    @JavascriptInterface
-    public String getCallSecretaryLogs() {
-        return vault.getCallLogsJson();
-    }
-
-    @JavascriptInterface
-    public String getDailyPlans() {
-        return vault.getDailyPlansJson();
-    }
-
-    @JavascriptInterface
-    public void addDailyPlan(String title, String timeStr, boolean isPrayer) {
-        upsertDailyPlan(timeStr, title, isPrayer ? "NAMOZ" : "PLAN", true);
-    }
-
-    @JavascriptInterface
-    public void simulateSecretaryCall(String callerNameOrNumber) {
-        simulateSecretaryCall(callerNameOrNumber, 6);
-    }
-
-    @JavascriptInterface
-    public boolean sendTelegramMessage(String contactName, String messageText, boolean preferPlus) {
-        return sendTelegramMessage(preferPlus ? "org.telegram.plus" : "org.telegram.messenger", contactName, messageText);
-    }
-
-    @JavascriptInterface
-    public boolean replyTelegramBackground(String sender, String replyText) {
-        return replyLatestNotificationInline(sender, replyText);
-    }
-
-    @JavascriptInterface
-    public void setFocusGuardEnabled(boolean enabled) {
-        vault.setMemory("focus_guard_enabled", enabled ? "true" : "false");
-    }
-
-    @JavascriptInterface
-    public void triggerInstagramBlockTest() {
-        triggerInstagramFocusBlockDemo();
-    }
-
-    @JavascriptInterface
-    public boolean setSystemAlarm(int hour, int minute, String label) {
-        return setSystemAlarm(hour, minute, label, true);
-    }
-
-    @JavascriptInterface
-    public boolean unlockDevice(String pin) {
-        return unlockDeviceWithPin(pin);
-    }
-
-    @JavascriptInterface
-    public void saveUnlockPin(String pin) {
-        if (pin != null) {
-            vault.setMemory("device_unlock_pin", pin.trim());
-        }
-    }
-
-    @JavascriptInterface
-    public void speakUzbek(String text) {
-        speakNative(text);
-    }
-
-    @JavascriptInterface
-    public boolean launchApp(String packageOrQuery) {
-        return launchInstalledApp(packageOrQuery);
     }
 
     // ========================================================================
@@ -297,11 +240,28 @@ public class NovaBridge {
         return false;
     }
 
+    @JavascriptInterface
+    public boolean unlockDevice(String pin) {
+        return unlockDeviceWithPin(pin);
+    }
+
+    @JavascriptInterface
+    public void saveUnlockPin(String pin) {
+        if (pin != null) {
+            vault.setMemory("device_unlock_pin", pin.trim());
+        }
+    }
+
     // ========================================================================
     // 3. 6-GUDOK CALL SECRETARY & RELATIONSHIP MATRIX
     // ========================================================================
     @JavascriptInterface
     public String getRelationshipMatrixJson() {
+        return vault.getRelationshipMatrixJson();
+    }
+
+    @JavascriptInterface
+    public String getRelationshipMatrix() {
         return vault.getRelationshipMatrixJson();
     }
 
@@ -321,6 +281,11 @@ public class NovaBridge {
     }
 
     @JavascriptInterface
+    public String getCallSecretaryLogs() {
+        return vault.getCallLogsJson();
+    }
+
+    @JavascriptInterface
     public void simulateSecretaryCall(String callerNameOrNumber, int rings) {
         Intent sim = new Intent(activity, NovaCallSecretaryService.class);
         sim.putExtra("simulate_call", true);
@@ -333,6 +298,11 @@ public class NovaBridge {
         }
     }
 
+    @JavascriptInterface
+    public void simulateSecretaryCall(String callerNameOrNumber) {
+        simulateSecretaryCall(callerNameOrNumber, 6);
+    }
+
     // ========================================================================
     // 4. TELEGRAM PLUS (org.telegram.plus) & DIGITAL TWIN MESSENGER BRIDGE
     // ========================================================================
@@ -342,14 +312,12 @@ public class NovaBridge {
         String cleanRec = recipient.trim();
         String cleanMsg = message.trim();
 
-        // 1. Try instant background Notification RemoteInput reply first if matching sender
         if (NovaNotificationService.getInstance() != null) {
             if (NovaNotificationService.getInstance().sendInlineReply(cleanRec, cleanMsg)) {
                 return true;
             }
         }
 
-        // 2. Determine whether Telegram Plus (org.telegram.plus) or standard Telegram is installed
         String targetPkg = "org.telegram.plus";
         if (preferredPackage != null && !preferredPackage.isEmpty() && isPackageInstalled(preferredPackage)) {
             targetPkg = preferredPackage;
@@ -358,12 +326,10 @@ public class NovaBridge {
         }
 
         try {
-            // Queue Accessibility UI automation steps
             if (NovaAccessibilityService.getInstance() != null) {
                 NovaAccessibilityService.getInstance().startTelegramMessageAutomation(targetPkg, cleanRec, cleanMsg);
             }
 
-            // If recipient is a @username or +phone, launch direct tg:// link targeted at Telegram Plus
             if (cleanRec.startsWith("@") || cleanRec.matches("^[+0-9]{7,15}$")) {
                 String handle = cleanRec.startsWith("@") ? cleanRec.substring(1) : cleanRec;
                 Uri uri = Uri.parse("tg://resolve?domain=" + Uri.encode(handle) + "&text=" + Uri.encode(cleanMsg));
@@ -374,7 +340,6 @@ public class NovaBridge {
                 return true;
             }
 
-            // Otherwise launch the Telegram Plus / Telegram app directly so Accessibility searches & sends
             Intent launchIntent = activity.getPackageManager().getLaunchIntentForPackage(targetPkg);
             if (launchIntent != null) {
                 launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -386,11 +351,21 @@ public class NovaBridge {
     }
 
     @JavascriptInterface
+    public boolean sendTelegramMessage(String contactName, String messageText, boolean preferPlus) {
+        return sendTelegramMessage(preferPlus ? "org.telegram.plus" : "org.telegram.messenger", contactName, messageText);
+    }
+
+    @JavascriptInterface
     public boolean replyLatestNotificationInline(String sender, String replyText) {
         if (NovaNotificationService.getInstance() != null) {
             return NovaNotificationService.getInstance().sendInlineReply(sender, replyText);
         }
         return false;
+    }
+
+    @JavascriptInterface
+    public boolean replyTelegramBackground(String sender, String replyText) {
+        return replyLatestNotificationInline(sender, replyText);
     }
 
     // ========================================================================
@@ -399,6 +374,11 @@ public class NovaBridge {
     @JavascriptInterface
     public String getFocusAndUsageJson() {
         return FocusGuardianService.getTodayUsageSummaryJson(activity);
+    }
+
+    @JavascriptInterface
+    public void setFocusGuardEnabled(boolean enabled) {
+        vault.setMemory("focus_guardian_enabled", enabled ? "true" : "false");
     }
 
     @JavascriptInterface
@@ -414,6 +394,11 @@ public class NovaBridge {
     }
 
     @JavascriptInterface
+    public void triggerInstagramBlockTest() {
+        triggerInstagramFocusBlockDemo();
+    }
+
+    @JavascriptInterface
     public void unlockInstagramFocusLock() {
         vault.setMemory("instagram_lock_until_ms", "0");
         if (NovaAccessibilityService.getInstance() != null) {
@@ -421,9 +406,6 @@ public class NovaBridge {
         }
     }
 
-    /**
-     * Sets a system alarm hands-free using AlarmClock.ACTION_SET_ALARM with EXTRA_SKIP_UI = true.
-     */
     @JavascriptInterface
     public boolean setSystemAlarm(int hour, int minute, String label, boolean skipUi) {
         try {
@@ -441,7 +423,17 @@ public class NovaBridge {
     }
 
     @JavascriptInterface
+    public boolean setSystemAlarm(int hour, int minute, String label) {
+        return setSystemAlarm(hour, minute, label, true);
+    }
+
+    @JavascriptInterface
     public String getDailyPlansJson() {
+        return vault.getDailyPlansJson();
+    }
+
+    @JavascriptInterface
+    public String getDailyPlans() {
         return vault.getDailyPlansJson();
     }
 
@@ -458,8 +450,13 @@ public class NovaBridge {
         }
     }
 
+    @JavascriptInterface
+    public void addDailyPlan(String title, String timeStr, boolean isPrayer) {
+        upsertDailyPlan(timeStr, title, isPrayer ? "NAMOZ" : "PLAN", true);
+    }
+
     // ========================================================================
-    // 6. PERSISTENT MEMORY VAULT & SPEECH BRIDGE
+    // 6. PERSISTENT MEMORY VAULT, SPEECH & REAL APP LAUNCHER
     // ========================================================================
     @JavascriptInterface
     public void setMemory(String key, String value) {
@@ -469,6 +466,16 @@ public class NovaBridge {
     @JavascriptInterface
     public String getMemory(String key, String defaultVal) {
         return vault.getMemory(key, defaultVal);
+    }
+
+    @JavascriptInterface
+    public String vaultGet(String key, String defaultVal) {
+        return vault.getMemory(key, defaultVal);
+    }
+
+    @JavascriptInterface
+    public void vaultSet(String key, String value) {
+        vault.setMemory(key, value);
     }
 
     @JavascriptInterface
@@ -482,12 +489,22 @@ public class NovaBridge {
     }
 
     @JavascriptInterface
+    public void speakUzbek(String text) {
+        activity.speakTextNative(text);
+    }
+
+    @JavascriptInterface
     public void stopSpeakingNative() {
         activity.stopSpeakingNative();
     }
 
     @JavascriptInterface
-    public boolean launchInstalledApp(String packageOrQuery) {
+    public String launchInstalledApp(String packageOrQuery) {
+        return activity.launchAppByNameOrPackage(packageOrQuery);
+    }
+
+    @JavascriptInterface
+    public String launchApp(String packageOrQuery) {
         return activity.launchAppByNameOrPackage(packageOrQuery);
     }
 

@@ -3,340 +3,217 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="theme-color" content="#000000" />
-  <title>NOVA</title>
-  <link rel="stylesheet" href="css/nova-zero.css" />
+  <title>NOVA Overlay</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
-<body>
-  <!-- =====================================================================
-       1. PURE "ZERO-UI" STAGE (100% Minimalist — No Buttons, No Clutter)
-       - Single Tap on Orb: Start / Toggle Hands-Free Listening
-       - 1.5s Long-Press on Orb OR Two-Finger Swipe Up: Open Hidden Nova Studio
-       - Swipe Down on Orb: Switch to Bixby-style Compact Bottom Pill Mode
-       ===================================================================== -->
-  <main id="zero-ui-stage">
-    <canvas id="orb-canvas"></canvas>
-
-    <div id="orb-center-overlay">
-      <h1 id="orb-headline">Hi</h1>
-      <p id="orb-subtitle"></p>
-    </div>
-
-    <!-- Invisible Gesture Target over the Orb -->
-    <div id="orb-hit-target" aria-label="Nova Orb"></div>
-
-    <!-- Bixby-Style Compact Bottom Pill (Visible only in compact-pill mode) -->
-    <div id="compact-pill-bar">
-      <div id="pill-transcript">Hi, Nova eshitmoqda...</div>
-    </div>
-  </main>
+<body data-hud-mode="bixby" data-listening="false">
 
   <!-- =====================================================================
-       2. HIDDEN "NOVA STUDIO" GLASSMORPHISM SHEET
-       Opened ONLY when holding Orb for 1.5s or Two-Finger Swiping Up
+       1. TOP 75% TRANSPARENT DISMISS AREA
+       Shows the real Android launcher / apps behind the overlay.
+       Tapping anywhere here closes the overlay (NovaNative.hideOverlay()).
        ===================================================================== -->
-  <div id="nova-studio-backdrop">
-    <section id="nova-studio-sheet">
-      <div class="studio-grabber"></div>
+  <div id="transparent-dismiss-zone" aria-label="Dismiss Overlay"></div>
 
-      <header class="studio-header">
-        <div>
-          <div class="studio-title">NOVA STUDIO</div>
-          <div class="studio-sub">J.A.R.V.I.S. • Digital Twin • Zero-UI Control</div>
-        </div>
-        <button id="btn-close-studio" class="studio-close-btn" aria-label="Close">✕</button>
-      </header>
+  <!-- =====================================================================
+       2. GEMINI LIVE 4-SIDE EDGE GLOW + CORNER BRACKETS + PARTICLE MIST
+       (Active in Rejim B: Gemini Edge Glow Mode — Screenshots 2 & 3)
+       ===================================================================== -->
+  <div id="gemini-edge-frame">
+    <div class="edge-glow-border"></div>
+    <div class="gemini-corner tl"></div>
+    <div class="gemini-corner tr"></div>
+    <canvas id="gemini-mist-canvas"></canvas>
+  </div>
 
-      <!-- Navigation Tabs -->
-      <nav class="studio-tabs">
-        <button class="studio-tab active" data-tab="orb">1. Orb & Zero-UI</button>
-        <button class="studio-tab" data-tab="voice">2. Ovoz & Qulf</button>
-        <button class="studio-tab" data-tab="secretary">3. 6-Gudok & Matritsa</button>
-        <button class="studio-tab" data-tab="telegram">4. Telegram Plus Twin</button>
-        <button class="studio-tab" data-tab="focus">5. Fokus & 5-Mahal Namoz</button>
-        <button class="studio-tab" data-tab="permissions">6. Ruxsatlar (1-Tap)</button>
-      </nav>
+  <!-- =====================================================================
+       3. COMPACT BOTTOM OVERLAY HUD (Rejim A: Bixby Mini Card | Rejim B: Gemini Live)
+       ===================================================================== -->
+  <div id="compact-hud-root">
 
-      <!-- =================================================================
-           PANEL 1: ORB SKINS & ZERO-UI MODE
-           ================================================================= -->
-      <div id="panel-orb" class="studio-panel active">
-        <div class="studio-card">
-          <div class="studio-card-title">4 Ta Minimalistik Jonli Orb Skinlari (60/120 FPS FFT)</div>
-          <div class="skin-grid">
-            <div class="skin-card selected" data-skin="cyan_ring">
-              <div class="skin-swatch" style="background: linear-gradient(135deg, #00F0FF, #0066FF);"></div>
-              <div class="skin-name">Nova Cyan Ring</div>
-              <div class="skin-desc">4 qatlamli neon moviy-firuza suyuq plazma halqasi</div>
-            </div>
+    <!-- ===================================================================
+         REJIM A: BIXBY MINI CARD + 68x68 3D LIQUID SPHERE (Screenshot 1)
+         =================================================================== -->
+    <section id="bixby-hud">
+      <div id="bixby-mini-card">
+        <!-- Top-right Settings Gear (⚙️) -->
+        <button id="bixby-settings-btn" class="bixby-card-gear" aria-label="Settings">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
 
-            <div class="skin-card" data-skin="solar_eclipse">
-              <div class="skin-swatch" style="background: linear-gradient(135deg, #FF5500, #FFFFFF);"></div>
-              <div class="skin-name">Solar Eclipse</div>
-              <div class="skin-desc">Qop-qora fonda ingichka olovrang-oq quyosh tutilishi</div>
-            </div>
+        <!-- Main Transcript / Assistant Response Text -->
+        <div id="bixby-card-text">Eshitmoqdaman...</div>
+        <div id="bixby-card-sub" class="bixby-card-sub">3.5s pauza kutish faol • "Telegram Plus'ni och", "Budilnik qo'y"</div>
 
-            <div class="skin-card" data-skin="quantum_sphere">
-              <div class="skin-swatch" style="background: radial-gradient(circle, #FFFFFF, #38BDF8);"></div>
-              <div class="skin-name">Quantum Sphere</div>
-              <div class="skin-desc">3D makonda to'lqinlanuvchi 1500 ta oq zarralar shari</div>
-            </div>
-
-            <div class="skin-card" data-skin="violet_aura">
-              <div class="skin-swatch" style="background: linear-gradient(135deg, #7B2CBF, #3A86FF);"></div>
-              <div class="skin-name">Violet Aura</div>
-              <div class="skin-desc">Yumshoq binafsha-ko'k pulsatsiya halqasi</div>
-            </div>
-          </div>
+        <!-- Inline Keyboard Input Row (toggled by keyboard icon) -->
+        <div id="bixby-inline-input-row">
+          <input id="bixby-inline-input" type="text" placeholder="Buyruq yoki savol yozing..." autocomplete="off" />
+          <button id="bixby-inline-send">Yuborish</button>
         </div>
 
-        <div class="studio-card">
-          <div class="studio-card-title">Bixby Compact Bottom Pill & Tezkor Buyruq</div>
-          <div class="studio-row">
-            <div class="studio-row-info">
-              <div class="studio-row-title">Compact Bottom Pill Rejimi</div>
-              <div class="studio-row-sub">Pastki minimalistik kapsula rejimiga o'tish (yoki Orbni pastga suring)</div>
-            </div>
-            <button id="btn-toggle-pill-mode" class="studio-btn primary">Pill Rejim</button>
-          </div>
-          <div class="input-group">
-            <input id="input-quick-cmd" class="studio-input" type="text" placeholder="Masalan: Jamshidga salom bro deb yoz..." />
-            <button id="btn-run-quick-cmd" class="studio-btn primary">Bajarish</button>
-          </div>
-        </div>
+        <!-- Bottom-right Keyboard Icon (⌨️) -->
+        <button id="bixby-kb-btn" class="bixby-card-kb" aria-label="Keyboard">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+            <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M7 16h10"></path>
+          </svg>
+        </button>
       </div>
 
-      <!-- =================================================================
-           PANEL 2: VOICE BIOMETRICS & AUTO-UNLOCK ENGINE
-           ================================================================= -->
-      <div id="panel-voice" class="studio-panel">
-        <div class="studio-card">
-          <div class="studio-card-title">Ovoz Biometrikasi (Voice Biometric Lock — 3 Namuna)</div>
-          <div class="studio-row">
-            <div class="studio-row-info">
-              <div class="studio-row-title">Akustik Spektr (Pitch, Formant, Cadence)</div>
-              <div class="studio-row-sub">Nova faqat sizning ovozingizni taniydi va begona ovozlarni bloklaydi</div>
-            </div>
-            <span id="bio-status-badge" class="badge badge-warn">0/3 namuna</span>
-          </div>
-          <div class="input-group">
-            <button id="btn-enroll-voice" class="studio-btn primary" style="flex:1;">Ovoz Namunasini Yozish (0/3)</button>
-            <button id="btn-reset-voice" class="studio-btn">Tozalash</button>
-          </div>
-        </div>
+      <!-- 68px x 68px Floating 3D Liquid Blue-Cyan Sphere (Bixby Orb) -->
+      <button id="bixby-orb-button" aria-label="Nova Voice Orb">
+        <canvas id="bixby-orb-canvas" width="136" height="136"></canvas>
+      </button>
+    </section>
 
-        <div class="studio-card">
-          <div class="studio-card-title">"Anti-Bixby" Semantic End-of-Turn VAD</div>
-          <div class="studio-row">
-            <div class="studio-row-info">
-              <div class="studio-row-title">Fikr Tugashini Kutish (3.8s Conjunction Hold)</div>
-              <div class="studio-row-sub">Gap "va", "keyin", "yani", "lekin", "haligi..." bilan tugasa, Nova gapni bo'lmaydi</div>
-            </div>
-            <span class="badge badge-ok">Faol (3800ms)</span>
-          </div>
-        </div>
+    <!-- ===================================================================
+         REJIM B: GEMINI LIVE EDGE GLOW + ROUNDED CAPSULE (Screenshots 2 & 3)
+         =================================================================== -->
+    <section id="gemini-hud">
+      <!-- Floating AI Response Bubble above capsule -->
+      <div id="gemini-response-bubble"></div>
 
-        <div class="studio-card">
-          <div class="studio-card-title">Lock-Screen Ustida Ishlash & Avto-Qulf Ochish</div>
-          <div class="studio-row-sub">Ekran qulflanganda "Hey Nova, qulfni och" desangiz, Accessibility/Root orqali PIN terib ochadi:</div>
-          <div class="input-group">
-            <input id="input-unlock-pin" class="studio-input" type="password" placeholder="Ekran PIN yoki paroli (masalan: 1234)" />
-            <button id="btn-save-unlock-pin" class="studio-btn primary">PIN Saqlash</button>
-            <button id="btn-test-unlock" class="studio-btn">Sinash</button>
-          </div>
-        </div>
+      <!-- Floating Action Pill ("Share screen with Live" + Mode Switch) -->
+      <div class="gemini-floating-pills">
+        <button id="btn-share-live-pill" class="gemini-pill-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <path d="M12 13V7M9 10l3-3 3 3M8 21h8"></path>
+          </svg>
+          <span>Share screen with Live</span>
+        </button>
+        <button id="btn-switch-to-bixby-pill" class="gemini-pill-btn" title="Bixby Mini Card rejimiga o'tish">
+          <span>🔵 Bixby Mode</span>
+        </button>
       </div>
 
-      <!-- =================================================================
-           PANEL 3: 6-GUDOK CALL SECRETARY & RELATIONSHIP MATRIX
-           ================================================================= -->
-      <div id="panel-secretary" class="studio-panel">
-        <div class="studio-card">
-          <div class="studio-card-title">6-Gudok Kotib Tizimi (Call Secretary)</div>
-          <div class="studio-row">
-            <div class="studio-row-info">
-              <div class="studio-row-title">7-chaqiruvda Avto-Ko'tarish & Jonli Suhbat</div>
-              <div class="studio-row-sub">6 gudok (~22 soniya) javob bermasangiz, Nova qo'ng'iroqni ko'tarib, kimligiga qarab muomala qiladi va yozib oladi</div>
-            </div>
-            <span class="badge badge-ok">Yoqilgan</span>
-          </div>
-          <div class="input-group">
-            <select id="select-sim-caller" class="studio-select">
-              <option value="Onam">Onam (Ota-Ona — Eng yuqori ehtirom)</option>
-              <option value="Dadam">Dadam (Ota-Ona — Eng yuqori ehtirom)</option>
-              <option value="Bobom">Bobom (Bobo-Buvi — Duo va ehtirom)</option>
-              <option value="Ustoz">Ustoz (Rasmiy va odobli)</option>
-              <option value="Jamshid">Jamshid (Do'st — Samimiy "bro")</option>
-              <option value="+998990009988">Begona raqam (Ehtiyotkor tekshiruv)</option>
-            </select>
-            <button id="btn-simulate-6gudok" class="studio-btn primary">6-Gudok Simulyatsiya</button>
-          </div>
-        </div>
+      <!-- Bottom Capsule (border-radius: 32px, background: rgba(15, 18, 24, 0.94)) -->
+      <div id="gemini-capsule">
+        <!-- Left '+' Button -->
+        <button id="gemini-plus-btn" class="gemini-icon-btn" aria-label="Settings & Tools">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
 
-        <div class="studio-card">
-          <div class="studio-card-title">Insonlar Matritsasi (Relationship Matrix)</div>
-          <div class="input-group" style="margin-bottom:10px;">
-            <input id="matrix-name" class="studio-input" type="text" placeholder="Ism (Onam, Jamshid...)" />
-            <input id="matrix-phone" class="studio-input" type="tel" placeholder="+99890..." />
-            <select id="matrix-category" class="studio-select">
-              <option value="OTA_ONA">OTA-ONA (Sizlab)</option>
-              <option value="BOBO_BUVI">BOBO-BUVI (Ehtirom)</option>
-              <option value="USTOZ">USTOZ (Rasmiy)</option>
-              <option value="DOST">DO'ST ("Bro")</option>
-              <option value="BEGONA">BEGONA (Tekshiruv)</option>
-            </select>
-            <button id="btn-add-matrix-contact" class="studio-btn primary">Qo'shish</button>
-          </div>
-          <div id="relationship-matrix-list"></div>
-        </div>
+        <!-- Center Input / Live Voice Transcript -->
+        <input id="gemini-input" type="text" placeholder="Ask Gemini" autocomplete="off" />
 
-        <div class="studio-card">
-          <div class="studio-card-title">Kotib Suhbat Yozuvlari & Xulosalar</div>
-          <div id="call-secretary-logs"></div>
-        </div>
-      </div>
+        <!-- Settings Gear (⚙️) -->
+        <button id="gemini-settings-btn" class="gemini-icon-btn" aria-label="Settings">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
 
-      <!-- =================================================================
-           PANEL 4: TELEGRAM PLUS (`org.telegram.plus`) & DIGITAL TWIN
-           ================================================================= -->
-      <div id="panel-telegram" class="studio-panel">
-        <div class="studio-card">
-          <div class="studio-card-title">Telegram Plus (`org.telegram.plus`) & Ghost Twin Rejimi</div>
-          <div class="studio-row">
-            <div class="studio-row-info">
-              <div class="studio-row-title">Ghost Twin Avto-Javob (Digital Twin)</div>
-              <div class="studio-row-sub">Kelgan xabarlarga Insonlar Matritsasi ohangida (Onaga sizlab, do'stga "bro" deb) avtomatik javob qaytaradi</div>
-            </div>
-            <div id="toggle-ghost-twin" class="studio-toggle"></div>
-          </div>
+        <!-- Glowing Blue Mic Button (🎤) -->
+        <button id="gemini-mic-btn" aria-label="Voice Input">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+            <line x1="8" y1="23" x2="16" y2="23"></line>
+          </svg>
+        </button>
 
-          <div class="input-group" style="margin-top:12px;">
-            <input id="tg-target-contact" class="studio-input" type="text" placeholder="Kontakt (masalan: Jamshid)" />
-            <input id="tg-target-msg" class="studio-input" type="text" placeholder="Xabar matni..." />
-            <button id="btn-send-tg-plus" class="studio-btn primary">TG Plus Yuborish</button>
-          </div>
-        </div>
-
-        <div class="studio-card">
-          <div class="studio-card-title">Direct Telegram Userbot (MTProto / GramJS Bridge)</div>
-          <div class="input-group">
-            <input id="tg-api-id" class="studio-input" type="text" placeholder="API ID" />
-            <input id="tg-api-hash" class="studio-input" type="password" placeholder="API Hash" />
-          </div>
-          <div class="input-group">
-            <input id="tg-phone" class="studio-input" type="tel" placeholder="Telefon (+998...)" />
-            <button id="btn-save-mtproto" class="studio-btn primary">MTProto Userbotni Saqlash</button>
-          </div>
-        </div>
-
-        <div class="studio-card">
-          <div class="studio-card-title">So'nggi Telegram Plus Xabarlari</div>
-          <div id="tg-recent-messages"></div>
-        </div>
-      </div>
-
-      <!-- =================================================================
-           PANEL 5: FOCUS GUARDIAN (INSTAGRAM 10M) & 5-MAHAL NAMOZ ALARMS
-           ================================================================= -->
-      <div id="panel-focus" class="studio-panel">
-        <div class="studio-card">
-          <div class="studio-card-title">Focus Guardian (Instagram 10-Daqiqa Bloklovchi)</div>
-          <div class="studio-row">
-            <div class="studio-row-info">
-              <div class="studio-row-title">Instagram (`com.instagram.android`) 10-Minut Cheklovi</div>
-              <div class="studio-row-sub">10 daqiqa to'xtovsiz o'tirilsa: "Bro, Instagramda 10 minutdan beri o'tiribsan, maqsadlardan chalg'ima, yopamiz!" deb yopadi va 30 daqiqaga bloklaydi</div>
-            </div>
-            <div id="toggle-focus-guard" class="studio-toggle on"></div>
-          </div>
-          <div class="input-group">
-            <button id="btn-test-ig-block" class="studio-btn primary" style="width:100%;">Instagram Bloklashni Hozir Sinash</button>
-          </div>
-        </div>
-
-        <div class="studio-card">
-          <div class="studio-card-title">Avtomatik 5-Mahal Namoz Vaqtlari & Tizim Budilnigi</div>
-          <div class="input-group" style="margin-bottom:10px;">
-            <input id="input-prayer-city" class="studio-input" type="text" value="Namangan" placeholder="Shahar (Namangan, Tashkent...)" />
-            <button id="btn-sync-namoz-alarms" class="studio-btn primary">5 Mahal Namozga Avto-Budilnik O'rnatish</button>
-          </div>
-          <div id="prayer-times-grid" class="prayer-grid"></div>
-        </div>
-
-        <div class="studio-card">
-          <div class="studio-card-title">Kunlik Rejalar va Odatlar (Silent-UI Alarm)</div>
-          <div class="input-group" style="margin-bottom:10px;">
-            <input id="plan-title" class="studio-input" type="text" placeholder="Yangi reja (masalan: Kitob o'qish)" />
-            <input id="plan-time" class="studio-input" type="time" value="06:30" style="max-width:120px;" />
-            <button id="btn-add-daily-plan" class="studio-btn primary">Budilnik + Reja</button>
-          </div>
-          <div id="daily-plans-list"></div>
-        </div>
-      </div>
-
-      <!-- =================================================================
-           PANEL 6: 1-TAP PERMISSION CENTER
-           ================================================================= -->
-      <div id="panel-permissions" class="studio-panel">
-        <div class="studio-card">
-          <div class="studio-card-title">1-Tap Permission Center (Tizim Ruxsatlari)</div>
-
-          <div class="studio-row">
-            <div class="studio-row-info">
-              <div class="studio-row-title">Accessibility Service (Avto-Qulf Ochish & Telegram Plus UI)</div>
-              <div class="studio-row-sub">Ekranni avtomatik ochish, Telegram Plus ichida xabar yozish va Instagramni yopish</div>
-            </div>
-            <span id="perm-badge-accessibility" class="badge badge-warn">Tekshirish</span>
-            <button class="studio-btn primary" data-perm-action="accessibility">Yoqish</button>
-          </div>
-
-          <div class="studio-row">
-            <div class="studio-row-info">
-              <div class="studio-row-title">Notification Listener (Orqa Fonda Telegram Javob)</div>
-              <div class="studio-row-sub">Telegram Plus xabarlarini o'qish va ilovani ochmasdan javob qaytarish</div>
-            </div>
-            <span id="perm-badge-notification" class="badge badge-warn">Tekshirish</span>
-            <button class="studio-btn primary" data-perm-action="notification">Yoqish</button>
-          </div>
-
-          <div class="studio-row">
-            <div class="studio-row-info">
-              <div class="studio-row-title">Display Over Other Apps (Lock-Screen & Compact Pill)</div>
-              <div class="studio-row-sub">Qulf ekrani ustida va boshqa ilovalar ustida Nova Orb ko'rinishi</div>
-            </div>
-            <span id="perm-badge-overlay" class="badge badge-warn">Tekshirish</span>
-            <button class="studio-btn primary" data-perm-action="overlay">Yoqish</button>
-          </div>
-
-          <div class="studio-row">
-            <div class="studio-row-info">
-              <div class="studio-row-title">Usage Access (Instagram 10-Daqiqa Hisoblagich)</div>
-              <div class="studio-row-sub">Focus Guardian ilovalar vaqtini aniq o'lchashi uchun</div>
-            </div>
-            <span id="perm-badge-usage" class="badge badge-warn">Tekshirish</span>
-            <button class="studio-btn primary" data-perm-action="usage">Yoqish</button>
-          </div>
-
-          <div class="studio-row">
-            <div class="studio-row-info">
-              <div class="studio-row-title">Mikrofon, Qo'ng'iroqlar va Budilnik Ruxsatlari</div>
-              <div class="studio-row-sub">Hands-Free "Hey Nova", 6-Gudok Kotib va Avto-Budilnik uchun</div>
-            </div>
-            <span id="perm-badge-root" class="badge badge-cyan">Runtime</span>
-            <button class="studio-btn primary" data-perm-action="runtime">Tasdiqlash</button>
-          </div>
-        </div>
+        <!-- Rightmost Live Waveform / Send Button -->
+        <button id="gemini-live-wave-btn" aria-label="Send or Live">
+          <span class="wave-bar" id="wb-1" style="height:8px;"></span>
+          <span class="wave-bar" id="wb-2" style="height:16px;"></span>
+          <span class="wave-bar" id="wb-3" style="height:10px;"></span>
+        </button>
       </div>
     </section>
   </div>
 
-  <!-- Modular Architecture Scripts -->
-  <script src="js/memory-vault.js"></script>
-  <script src="js/orb-renderer.js"></script>
-  <script src="js/voice-biometrics-vad.js"></script>
-  <script src="js/relationship-secretary.js"></script>
-  <script src="js/telegram-twin.js"></script>
-  <script src="js/focus-prayer-scheduler.js"></script>
-  <script src="js/nova-brain.js"></script>
+  <!-- =====================================================================
+       4. SETTINGS (⚙️) & PERMISSIONS BOTTOM-SHEET
+       ===================================================================== -->
+  <div id="settings-sheet-backdrop">
+    <div id="settings-bottom-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div class="sheet-title">⚙️ NOVA Overlay Sozlamalari</div>
+        <button id="sheet-close-btn" class="sheet-close">✕</button>
+      </div>
+
+      <!-- HUD Mode Switcher: Bixby Mode vs Gemini Edge Mode -->
+      <div class="sheet-section">
+        <div class="sheet-section-title">1. Overlay Dizayn Rejimi</div>
+        <div class="mode-switch-grid">
+          <button id="mode-btn-bixby" class="mode-option-btn active">
+            🔵 Bixby Mini Card
+          </button>
+          <button id="mode-btn-gemini" class="mode-option-btn">
+            ✨ Gemini Live Edge
+          </button>
+        </div>
+      </div>
+
+      <!-- Gemini API Key & Groq API Key -->
+      <div class="sheet-section">
+        <div class="sheet-section-title">2. AI API Kalitlari (Haqiqiy Fetch)</div>
+        <label class="field-label" for="input-gemini-key">Gemini API Key (generativelanguage.googleapis.com)</label>
+        <input id="input-gemini-key" class="sheet-input" type="password" placeholder="AIzaSy... (ixtiyoriy, zahira kalit mavjud)" autocomplete="off" />
+
+        <label class="field-label" for="input-groq-key">Groq API Key (api.groq.com — Llama 3.3 70B)</label>
+        <input id="input-groq-key" class="sheet-input" type="password" placeholder="gsk_... (ixtiyoriy, zahira kalit mavjud)" autocomplete="off" />
+
+        <button id="btn-save-api-keys" class="sheet-save-btn">API Kalitlarni Saqlash</button>
+      </div>
+
+      <!-- Real Android Permissions via NovaBridge -->
+      <div class="sheet-section">
+        <div class="sheet-section-title">3. Tizim Ruxsatlari (Real Android Settings)</div>
+
+        <div class="perm-row">
+          <div class="perm-info">
+            <div class="perm-name">🎤 Microphone (Ovoz eshitish)</div>
+            <div class="perm-desc">3.5s pauza bilan ovozni yozib olish va "Hey Nova"</div>
+          </div>
+          <button class="perm-action-btn" data-perm="microphone" id="perm-btn-microphone">Yoqish</button>
+        </div>
+
+        <div class="perm-row">
+          <div class="perm-info">
+            <div class="perm-name">🤖 Accessibility Service</div>
+            <div class="perm-desc">Telegram Plus ichida xabar yozish, qulf ochish va avto-boshqaruv</div>
+          </div>
+          <button class="perm-action-btn" data-perm="accessibility" id="perm-btn-accessibility">Sozlash</button>
+        </div>
+
+        <div class="perm-row">
+          <div class="perm-info">
+            <div class="perm-name">🪟 Overlay (Ilovalar ustida ko'rinish)</div>
+            <div class="perm-desc">Boshqa ilovalar va qulf ekrani ustida shaffof chiqish</div>
+          </div>
+          <button class="perm-action-btn" data-perm="overlay" id="perm-btn-overlay">Sozlash</button>
+        </div>
+
+        <div class="perm-row">
+          <div class="perm-info">
+            <div class="perm-name">📞 Phone Calls (Qo'ng'iroqlar & 6-Gudok)</div>
+            <div class="perm-desc">Qo'ng'iroqlarni boshqarish va 6-gudok kotib tizimi</div>
+          </div>
+          <button class="perm-action-btn" data-perm="phoneCalls" id="perm-btn-phoneCalls">Yoqish</button>
+        </div>
+
+        <div class="perm-row">
+          <div class="perm-info">
+            <div class="perm-name">📊 Usage Stats (Instagram vaqti)</div>
+            <div class="perm-desc">Ilovalarda o'tkazilgan vaqtni hisoblash</div>
+          </div>
+          <button class="perm-action-btn" data-perm="usageStats" id="perm-btn-usageStats">Sozlash</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="js/app.js"></script>
 </body>
 </html>

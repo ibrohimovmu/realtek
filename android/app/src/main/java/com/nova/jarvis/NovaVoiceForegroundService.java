@@ -36,6 +36,7 @@ public class NovaVoiceForegroundService extends Service {
     private static final int NOTIF_ID = 4011;
 
     private static boolean isRunning = false;
+    private static NovaVoiceForegroundService activeInstance;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SpeechRecognizer wakeRecognizer;
     private boolean recognizerBusy = false;
@@ -43,6 +44,19 @@ public class NovaVoiceForegroundService extends Service {
 
     public static boolean isServiceRunning() {
         return isRunning;
+    }
+
+    public static void yieldMicNow() {
+        final NovaVoiceForegroundService inst = activeInstance;
+        if (inst == null) return;
+        inst.handler.post(() -> {
+            try {
+                if (inst.wakeRecognizer != null) {
+                    inst.wakeRecognizer.cancel();
+                }
+            } catch (Throwable ignored) {}
+            inst.recognizerBusy = false;
+        });
     }
 
     private final Runnable restartListeningTask = new Runnable() {
@@ -56,6 +70,7 @@ public class NovaVoiceForegroundService extends Service {
     public void onCreate() {
         super.onCreate();
         isRunning = true;
+        activeInstance = this;
         createChannel();
         acquirePartialWakeLock();
     }
@@ -248,6 +263,7 @@ public class NovaVoiceForegroundService extends Service {
     @Override
     public void onDestroy() {
         isRunning = false;
+        if (activeInstance == this) activeInstance = null;
         handler.removeCallbacksAndMessages(null);
         if (wakeRecognizer != null) {
             try { wakeRecognizer.destroy(); } catch (Throwable ignored) {}

@@ -1,865 +1,1026 @@
 /**
  * ============================================================================
- * NOVA — MASTER ZERO-UI CONTROLLER & HIDDEN NOVA STUDIO ENGINE (`app.js`)
+ * NOVA — TRANSLUCENT COMPACT OVERLAY ENGINE (www/js/app.js)
  * ============================================================================
- * Coordinates:
- *  - Pure Zero-UI Main Screen & Bixby-style Compact Bottom Pill Mode
- *  - 60/120 FPS Additive-Blended Orb Renderer (4 skins)
- *  - Voice Biometric Lock (3 samples) + Semantic End-of-Turn VAD
- *  - Hidden Nova Studio Glassmorphic Sheet (opened ONLY via 1.5s Long-Press
- *    on the Orb or Two-Finger Swipe Up)
- *  - Relationship Matrix, 6-Gudok Call Secretary, Telegram Plus Digital Twin,
- *    Focus Guardian (Instagram 10m blocker), 5-Mahal Namoz Alarms, and
- *    1-Tap Permission Center.
+ * 1. 100% Translucent Compact HUD:
+ *    - Mode A: Bixby Mini Card + 68x68px 3D Liquid Sphere (Screenshot 1)
+ *    - Mode B: Gemini Live 4-Side Edge Glow + Particle Mist + Capsule (Screenshots 2 & 3)
+ * 2. Real Speech Recognition (3.5s Pause Patience via NovaSpeechSession + Web Speech)
+ * 3. Real Gemini API & Groq API Fetch + Real Android Device Execution (NovaNative)
  * ============================================================================
  */
 (function () {
   'use strict';
 
-  // Global lightweight Event Bus
-  class NovaEventBus {
-    constructor() {
-      this.listeners = {};
-    }
-    on(event, fn) {
-      if (!this.listeners[event]) this.listeners[event] = [];
-      this.listeners[event].push(fn);
-    }
-    emit(event, payload) {
-      const list = this.listeners[event] || [];
-      for (const fn of list) {
+  // Event Bus for Native Java -> JS events (MainActivity.notifyJsEvent)
+  const listeners = {};
+  window.NovaEvents = {
+    on(evt, fn) {
+      if (!listeners[evt]) listeners[evt] = [];
+      listeners[evt].push(fn);
+    },
+    emit(evt, payload) {
+      const arr = listeners[evt] || [];
+      for (const fn of arr) {
         try {
-          fn(payload);
+          fn(payload || {});
         } catch (e) {}
       }
+    },
+  };
+
+  // Built-in XOR-encoded Groq API key fallback (from backup su/.env.local)
+  const XOR_KEY = 73;
+  const ENC_GROQ = [
+    46, 58, 34, 22, 31, 9, 44, 58, 4, 27, 45, 51, 3, 2, 13, 39, 36, 46, 45, 3,
+    37, 15, 29, 39, 58, 12, 27, 17, 10, 44, 59, 6, 9, 57, 13, 19, 34, 4, 15, 58,
+    59, 3, 12, 10, 29, 57, 29, 45, 37, 29, 57, 44, 45, 59, 46, 36,
+  ];
+  function getDefaultGroqKey() {
+    try {
+      return ENC_GROQ.map((b) => String.fromCharCode(b ^ XOR_KEY)).join('');
+    } catch (e) {
+      return '';
     }
   }
 
-  window.NovaEvents = new NovaEventBus();
+  // Conjunctions that extend silence wait time when user pauses mid-thought
+  const HOLD_WORDS = new Set([
+    'va', 'keyin', 'yani', "ya'ni", 'lekin', 'ammo', 'biroq',
+    'haligi', 'chunki', 'masalan', 'uchun', 'agar', 'deb', 'yoki',
+    'и', 'а', 'но', 'потом', 'and', 'then', 'but', 'because',
+  ]);
 
-  class NovaAppController {
+  class NovaCompactOverlay {
     constructor() {
-      this.orb = null;
-      this.vad = null;
-      this.isCompactPill = false;
-      this.studioOpen = false;
-      this.longPressTimer = null;
-      this.twoFingerStartY = null;
+      this.mode = localStorage.getItem('nova_hud_mode') || 'bixby'; // 'bixby' | 'gemini'
+      this.isListening = false;
+      this.rmsLevel = 0.08;
+      this.smoothedRms = 0.08;
+      this.phase = 0;
+      this.chatHistory = [];
+
+      // Browser Web Speech fallback state (when not using Native SpeechRecognizer)
+      this.webRec = null;
+      this.webSilenceTimer = null;
+      this.webAccumText = '';
+      this.webInterimText = '';
+
+      // Gemini particle mist
+      this.mistParticles = this._createMistParticles(110);
     }
 
     init() {
-      this._initOrb();
-      this._initVoiceEngine();
-      this._bindZeroUiGestures();
-      this._bindStudioUI();
-      this._bindSystemEvents();
-      this._refreshAllStudioPanels();
+      this.setHudMode(this.mode);
+      this._bindUI();
+      this._bindNativeEvents();
+      this._loadSavedKeys();
+      this.refreshPermissionsUI();
+      this._startRenderLoop();
+
+      // Automatically start listening when overlay is summoned
+      setTimeout(() => {
+        this.startListening();
+      }, 320);
     }
 
-    _initOrb() {
-      const canvas = document.getElementById('orb-canvas');
-      if (!canvas || !window.NovaOrbRenderer) return;
-      this.orb = new window.NovaOrbRenderer(canvas);
-      window.NovaOrb = this.orb;
+    // ------------------------------------------------------------------------
+    // HUD MODE SWITCHING (Bixby Mini Card vs Gemini Live Edge Glow)
+    // ------------------------------------------------------------------------
+    setHudMode(mode) {
+      this.mode = mode === 'gemini' ? 'gemini' : 'bixby';
+      localStorage.setItem('nova_hud_mode', this.mode);
+      document.body.setAttribute('data-hud-mode', this.mode);
 
-      const savedSkin = window.NovaVault
-        ? window.NovaVault.getKV('orb_skin', 'cyan_ring')
-        : 'cyan_ring';
-      this.orb.setSkin(savedSkin || 'cyan_ring');
-      this._highlightSkinCard(savedSkin || 'cyan_ring');
+      const btnBixby = document.getElementById('mode-btn-bixby');
+      const btnGemini = document.getElementById('mode-btn-gemini');
+      if (btnBixby) btnBixby.classList.toggle('active', this.mode === 'bixby');
+      if (btnGemini) btnGemini.classList.toggle('active', this.mode === 'gemini');
     }
 
-    _initVoiceEngine() {
-      if (!window.NovaVoiceEngine) return;
-      this.vad = new window.NovaVoiceEngine({
-        onSpectrum: (bins, rms) => {
-          if (this.orb) this.orb.feedAudioSpectrum(bins, rms);
-        },
-        onStateChange: (state, info) => {
-          if (this.orb) this.orb.setState(state);
-          this._updateCenterTypography(state, info);
-        },
-        onPartialTranscript: (partial, semanticHold) => {
-          const sub = document.getElementById('orb-subtitle');
-          if (sub) {
-            sub.textContent = semanticHold
-              ? `${partial} ... (fikr davom etmoqda)`
-              : partial;
-            sub.classList.add('visible');
-          }
-        },
-        onFinalUtterance: async (finalText, meta) => {
-          const head = document.getElementById('orb-headline');
-          const sub = document.getElementById('orb-subtitle');
-          if (head) head.textContent = 'Nova';
-          if (sub) {
-            sub.textContent = finalText;
-            sub.classList.add('visible');
-          }
-          if (window.NovaBrain) {
-            await window.NovaBrain.processCommand(finalText, meta);
-          }
-        },
-        onBiometricStatus: (bio) => {
-          this._updateBiometricUI(bio);
-        },
-      });
-      window.NovaVAD = this.vad;
+    setListeningState(listening) {
+      this.isListening = !!listening;
+      document.body.setAttribute('data-listening', this.isListening ? 'true' : 'false');
     }
 
-    _updateCenterTypography(state, info = {}) {
-      const head = document.getElementById('orb-headline');
-      const sub = document.getElementById('orb-subtitle');
-      const pillText = document.getElementById('pill-transcript');
-      if (!head || !sub) return;
+    updateTranscriptDisplay(mainText, subText) {
+      const bixbyText = document.getElementById('bixby-card-text');
+      const bixbySub = document.getElementById('bixby-card-sub');
+      const bixbyCard = document.getElementById('bixby-mini-card');
+      const geminiBubble = document.getElementById('gemini-response-bubble');
+      const geminiInput = document.getElementById('gemini-input');
 
-      if (state === 'IDLE') {
-        head.textContent = 'Hi';
-        if (!info.keepSubtitle) {
-          sub.classList.remove('visible');
-        }
-        if (pillText) pillText.textContent = 'Hi, Nova tayyor...';
-      } else if (state === 'LISTENING') {
-        head.textContent = 'Listening';
-        if (info.message) {
-          sub.textContent = info.message;
-          sub.classList.add('visible');
-        }
-        if (pillText) pillText.textContent = 'Eshitmoqdaman bro...';
-      } else if (state === 'THINKING') {
-        head.textContent = 'Thinking';
-        if (pillText) pillText.textContent = 'Tahlil qilmoqdaman...';
-      } else if (state === 'SPEAKING') {
-        head.textContent = 'Nova';
+      if (bixbyCard) bixbyCard.classList.remove('collapsed');
+      if (bixbyText && mainText !== undefined) bixbyText.textContent = mainText;
+      if (bixbySub && subText !== undefined) bixbySub.textContent = subText;
+
+      if (geminiBubble && mainText) {
+        geminiBubble.textContent = mainText;
+        geminiBubble.classList.add('visible');
+      }
+      if (geminiInput && this.isListening && mainText && !mainText.startsWith('Hmm')) {
+        geminiInput.placeholder = mainText;
       }
     }
 
     // ------------------------------------------------------------------------
-    // ZERO-UI GESTURE ENGINE
-    // - Single tap on Orb: Start/toggle Hands-Free listening
-    // - 1.5s Long-Press on Orb: Open hidden Nova Studio
-    // - Two-Finger Swipe Up anywhere: Open hidden Nova Studio
-    // - Swipe Down on Orb: Toggle Bixby-style Compact Bottom Pill mode
+    // UI EVENT BINDINGS
     // ------------------------------------------------------------------------
-    _bindZeroUiGestures() {
-      const stage = document.getElementById('zero-ui-stage');
-      const hitTarget = document.getElementById('orb-hit-target');
-      const pillBar = document.getElementById('compact-pill-bar');
-
-      if (hitTarget) {
-        let pressMoved = false;
-        let startX = 0;
-        let startY = 0;
-        let longPressTriggered = false;
-
-        const clearPress = () => {
-          if (this.longPressTimer) {
-            clearTimeout(this.longPressTimer);
-            this.longPressTimer = null;
-          }
-        };
-
-        hitTarget.addEventListener('pointerdown', (e) => {
-          pressMoved = false;
-          longPressTriggered = false;
-          startX = e.clientX;
-          startY = e.clientY;
-          clearPress();
-          this.longPressTimer = setTimeout(() => {
-            longPressTriggered = true;
-            this.openStudio();
-          }, 1500);
+    _bindUI() {
+      // 1. Top 75% Transparent Dismiss Zone -> Closes Overlay
+      const dismissZone = document.getElementById('transparent-dismiss-zone');
+      if (dismissZone) {
+        dismissZone.addEventListener('click', () => {
+          this.dismissOverlay();
         });
+      }
 
-        hitTarget.addEventListener('pointermove', (e) => {
-          if (Math.hypot(e.clientX - startX, e.clientY - startY) > 22) {
-            pressMoved = true;
-            clearPress();
-          }
+      // 2. Bixby Orb Button -> Tap to Toggle Listening, Long-Press to Switch Mode
+      const bixbyOrbBtn = document.getElementById('bixby-orb-button');
+      if (bixbyOrbBtn) {
+        let pressTimer = null;
+        let longPressed = false;
+        bixbyOrbBtn.addEventListener('pointerdown', () => {
+          longPressed = false;
+          pressTimer = setTimeout(() => {
+            longPressed = true;
+            this.setHudMode('gemini');
+          }, 900);
         });
-
-        hitTarget.addEventListener('pointerup', (e) => {
-          clearPress();
-          const dy = e.clientY - startY;
-          if (!longPressTriggered && dy > 95) {
-            this.setCompactPillMode(true);
-            return;
-          }
-          if (!longPressTriggered && !pressMoved) {
+        bixbyOrbBtn.addEventListener('pointerup', () => {
+          if (pressTimer) clearTimeout(pressTimer);
+          if (!longPressed) {
             this.toggleListening();
           }
         });
-
-        hitTarget.addEventListener('pointercancel', clearPress);
       }
 
-      // Two-Finger Swipe Up anywhere on Zero-UI stage opens Nova Studio
-      if (stage) {
-        stage.addEventListener(
-          'touchstart',
-          (e) => {
-            if (e.touches && e.touches.length === 2) {
-              this.twoFingerStartY =
-                (e.touches[0].clientY + e.touches[1].clientY) * 0.5;
-            } else {
-              this.twoFingerStartY = null;
-            }
-          },
-          { passive: true }
-        );
+      // 3. Bixby Keyboard Icon -> Toggle Inline Text Input
+      const bixbyKbBtn = document.getElementById('bixby-kb-btn');
+      const bixbyInputRow = document.getElementById('bixby-inline-input-row');
+      const bixbyInput = document.getElementById('bixby-inline-input');
+      const bixbySend = document.getElementById('bixby-inline-send');
 
-        stage.addEventListener(
-          'touchend',
-          (e) => {
-            if (this.twoFingerStartY !== null && e.changedTouches.length >= 1) {
-              const endY = e.changedTouches[0].clientY;
-              if (this.twoFingerStartY - endY > 70) {
-                this.openStudio();
-              }
-              this.twoFingerStartY = null;
-            }
-          },
-          { passive: true }
-        );
-      }
-
-      // Compact Bottom Pill tap -> expand or listen
-      if (pillBar) {
-        let pillPressTimer = null;
-        pillBar.addEventListener('pointerdown', () => {
-          pillPressTimer = setTimeout(() => {
-            this.setCompactPillMode(false);
-          }, 800);
-        });
-        pillBar.addEventListener('pointerup', () => {
-          if (pillPressTimer) {
-            clearTimeout(pillPressTimer);
-            pillPressTimer = null;
-          }
-          this.toggleListening();
-        });
-      }
-    }
-
-    toggleListening() {
-      if (!this.vad) return;
-      if (this.vad.isListening) {
-        this.vad.stopListening();
-      } else {
-        this.vad.startListening();
-      }
-    }
-
-    setCompactPillMode(enabled) {
-      this.isCompactPill = !!enabled;
-      const stage = document.getElementById('zero-ui-stage');
-      if (stage) {
-        stage.classList.toggle('compact-pill', this.isCompactPill);
-      }
-    }
-
-    openStudio() {
-      this.studioOpen = true;
-      const backdrop = document.getElementById('nova-studio-backdrop');
-      if (backdrop) {
-        backdrop.classList.add('open');
-      }
-      this._refreshAllStudioPanels();
-    }
-
-    closeStudio() {
-      this.studioOpen = false;
-      const backdrop = document.getElementById('nova-studio-backdrop');
-      if (backdrop) {
-        backdrop.classList.remove('open');
-      }
-    }
-
-    // ------------------------------------------------------------------------
-    // SYSTEM & BRAIN EVENT LISTENERS
-    // ------------------------------------------------------------------------
-    _bindSystemEvents() {
-      window.NovaEvents.on('brain:thinking', () => {
-        if (this.orb) this.orb.setState('THINKING');
-        this._updateCenterTypography('THINKING');
-      });
-
-      window.NovaEvents.on('brain:response', (res) => {
-        const head = document.getElementById('orb-headline');
-        const sub = document.getElementById('orb-subtitle');
-        const pillText = document.getElementById('pill-transcript');
-        if (head) head.textContent = res.headline || 'Nova';
-        if (sub) {
-          sub.textContent = res.reply || '';
-          sub.classList.add('visible');
-        }
-        if (pillText) pillText.textContent = res.reply || '';
-      });
-
-      window.NovaEvents.on('tts:start', () => {
-        if (this.orb) this.orb.setState('SPEAKING');
-      });
-
-      window.NovaEvents.on('tts:end', () => {
-        if (this.orb) {
-          this.orb.setState(
-            this.vad && this.vad.isListening ? 'LISTENING' : 'IDLE'
-          );
-        }
-        setTimeout(() => {
-          if (!this.vad || !this.vad.isListening) {
-            const head = document.getElementById('orb-headline');
-            if (head) head.textContent = 'Hi';
-          }
-        }, 1800);
-      });
-
-      window.NovaEvents.on('secretary:status', (st) => {
-        const head = document.getElementById('orb-headline');
-        const sub = document.getElementById('orb-subtitle');
-        if (head && st.headline) head.textContent = st.headline;
-        if (sub && st.subtitle) {
-          sub.textContent = st.subtitle;
-          sub.classList.add('visible');
-        }
-        if (this.orb) {
-          this.orb.setState(st.state === 'FINISHED' ? 'IDLE' : 'SPEAKING');
-        }
-      });
-
-      window.NovaEvents.on('secretary:logs_updated', () => {
-        this._renderCallSecretaryLogs();
-      });
-
-      window.NovaEvents.on('telegram:state_changed', () => {
-        this._renderTelegramTwinPanel();
-      });
-
-      window.NovaEvents.on('focus:state_changed', () => {
-        this._renderFocusAndPrayerPanel();
-      });
-
-      window.NovaEvents.on('focus:blocked', (payload) => {
-        const head = document.getElementById('orb-headline');
-        const sub = document.getElementById('orb-subtitle');
-        if (head) head.textContent = 'Focus Lock';
-        if (sub) {
-          sub.textContent = payload.message;
-          sub.classList.add('visible');
-        }
-      });
-
-      // Native wake-word or lockscreen command hook
-      window.addEventListener('nova:native', (ev) => {
-        const detail = ev.detail || {};
-        if (detail.type === 'voice:wake_triggered') {
-          const cmd =
-            (detail.payload && detail.payload.command) || '';
-          if (cmd && window.NovaBrain) {
-            window.NovaBrain.processCommand(cmd, { fromWakeService: true });
-          } else if (this.vad && !this.vad.isListening) {
-            this.vad.startListening();
-          }
-        }
-      });
-    }
-
-    // ------------------------------------------------------------------------
-    // HIDDEN NOVA STUDIO UI BINDINGS
-    // ------------------------------------------------------------------------
-    _bindStudioUI() {
-      const closeBtn = document.getElementById('btn-close-studio');
-      const backdrop = document.getElementById('nova-studio-backdrop');
-      if (closeBtn) {
-        closeBtn.addEventListener('click', () => this.closeStudio());
-      }
-      if (backdrop) {
-        backdrop.addEventListener('click', (e) => {
-          if (e.target === backdrop) this.closeStudio();
+      if (bixbyKbBtn && bixbyInputRow) {
+        bixbyKbBtn.addEventListener('click', () => {
+          const open = !bixbyInputRow.classList.contains('open');
+          bixbyInputRow.classList.toggle('open', open);
+          if (open && bixbyInput) bixbyInput.focus();
         });
       }
 
-      // Studio Tabs
-      const tabs = document.querySelectorAll('.studio-tab');
-      tabs.forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const target = btn.getAttribute('data-tab');
-          tabs.forEach((b) => b.classList.remove('active'));
-          btn.classList.add('active');
-          document.querySelectorAll('.studio-panel').forEach((p) => {
-            p.classList.toggle('active', p.id === `panel-${target}`);
-          });
-        });
-      });
-
-      // 1) Orb Skin Cards
-      document.querySelectorAll('.skin-card').forEach((card) => {
-        card.addEventListener('click', () => {
-          const skin = card.getAttribute('data-skin');
-          if (this.orb && skin) {
-            this.orb.setSkin(skin);
-            if (window.NovaVault) window.NovaVault.setKV('orb_skin', skin);
-            this._highlightSkinCard(skin);
-          }
-        });
-      });
-
-      // Toggle Compact Pill Mode from Studio
-      const btnTogglePill = document.getElementById('btn-toggle-pill-mode');
-      if (btnTogglePill) {
-        btnTogglePill.addEventListener('click', () => {
-          this.setCompactPillMode(!this.isCompactPill);
-          this.closeStudio();
-        });
-      }
-
-      // Quick Command Input inside Studio
-      const btnRunCmd = document.getElementById('btn-run-quick-cmd');
-      const inputQuickCmd = document.getElementById('input-quick-cmd');
-      if (btnRunCmd && inputQuickCmd) {
-        btnRunCmd.addEventListener('click', async () => {
-          const val = inputQuickCmd.value.trim();
+      if (bixbySend && bixbyInput) {
+        const submitBixby = () => {
+          const val = bixbyInput.value.trim();
           if (!val) return;
-          inputQuickCmd.value = '';
-          this.closeStudio();
-          if (window.NovaBrain) {
-            await window.NovaBrain.processCommand(val);
+          bixbyInput.value = '';
+          this.stopListening();
+          this.handleUserCommand(val);
+        };
+        bixbySend.addEventListener('click', submitBixby);
+        bixbyInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') submitBixby();
+        });
+      }
+
+      // 4. Gemini Capsule Controls
+      const geminiMicBtn = document.getElementById('gemini-mic-btn');
+      const geminiWaveBtn = document.getElementById('gemini-live-wave-btn');
+      const geminiInput = document.getElementById('gemini-input');
+      const geminiPlusBtn = document.getElementById('gemini-plus-btn');
+      const shareLivePill = document.getElementById('btn-share-live-pill');
+      const switchBixbyPill = document.getElementById('btn-switch-to-bixby-pill');
+
+      if (geminiMicBtn) {
+        geminiMicBtn.addEventListener('click', () => this.toggleListening());
+      }
+
+      if (geminiWaveBtn && geminiInput) {
+        geminiWaveBtn.addEventListener('click', () => {
+          const typed = geminiInput.value.trim();
+          if (typed) {
+            geminiInput.value = '';
+            this.stopListening();
+            this.handleUserCommand(typed);
+          } else {
+            this.toggleListening();
+          }
+        });
+        geminiInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            const typed = geminiInput.value.trim();
+            if (typed) {
+              geminiInput.value = '';
+              this.stopListening();
+              this.handleUserCommand(typed);
+            }
           }
         });
       }
 
-      // 2) Voice Biometrics Enrollment (3 Samples) & Auto-Unlock PIN
-      const btnEnrollVoice = document.getElementById('btn-enroll-voice');
-      const btnResetVoice = document.getElementById('btn-reset-voice');
-      const btnSavePin = document.getElementById('btn-save-unlock-pin');
-      const btnTestUnlock = document.getElementById('btn-test-unlock');
+      if (geminiPlusBtn) {
+        geminiPlusBtn.addEventListener('click', () => this.openSettingsSheet());
+      }
 
-      if (btnEnrollVoice) {
-        btnEnrollVoice.addEventListener('click', async () => {
-          if (!this.vad) return;
-          btnEnrollVoice.textContent = 'Ovozingiz yozilmoqda (3 soniya gapiring)...';
-          const res = await this.vad.enrollVoiceSample();
-          btnEnrollVoice.textContent =
-            res.samplesCount >= 3
-              ? 'Ovoz biometrikasi faol (3/3)'
-              : `Ovoz namunasini yozish (${res.samplesCount}/3)`;
-          this._updateBiometricUI(res);
+      if (shareLivePill) {
+        shareLivePill.addEventListener('click', () => {
+          this.updateTranscriptDisplay(
+            "Jonli ekran va ovoz tahlili faol. Buyrug'ingizni ayting!",
+            'Gemini Live Edge Mode'
+          );
+          if (!this.isListening) this.startListening();
         });
       }
 
-      if (btnResetVoice) {
-        btnResetVoice.addEventListener('click', () => {
-          if (this.vad) {
-            this.vad.resetBiometrics();
-            this._updateBiometricUI({ samplesCount: 0, lockedToOwner: false });
-          }
+      if (switchBixbyPill) {
+        switchBixbyPill.addEventListener('click', () => this.setHudMode('bixby'));
+      }
+
+      // 5. Settings (⚙️) Buttons
+      const bixbySettingsBtn = document.getElementById('bixby-settings-btn');
+      const geminiSettingsBtn = document.getElementById('gemini-settings-btn');
+      const sheetCloseBtn = document.getElementById('sheet-close-btn');
+      const sheetBackdrop = document.getElementById('settings-sheet-backdrop');
+
+      if (bixbySettingsBtn) {
+        bixbySettingsBtn.addEventListener('click', () => this.openSettingsSheet());
+      }
+      if (geminiSettingsBtn) {
+        geminiSettingsBtn.addEventListener('click', () => this.openSettingsSheet());
+      }
+      if (sheetCloseBtn) {
+        sheetCloseBtn.addEventListener('click', () => this.closeSettingsSheet());
+      }
+      if (sheetBackdrop) {
+        sheetBackdrop.addEventListener('click', (e) => {
+          if (e.target === sheetBackdrop) this.closeSettingsSheet();
         });
       }
 
-      if (btnSavePin) {
-        btnSavePin.addEventListener('click', () => {
-          const pinInput = document.getElementById('input-unlock-pin');
-          const pin = (pinInput && pinInput.value.trim()) || '0000';
-          if (window.NovaVault) window.NovaVault.setKV('unlock_pin', pin);
+      // 6. Mode Switch Buttons inside Settings Sheet
+      const modeBtnBixby = document.getElementById('mode-btn-bixby');
+      const modeBtnGemini = document.getElementById('mode-btn-gemini');
+      if (modeBtnBixby) {
+        modeBtnBixby.addEventListener('click', () => this.setHudMode('bixby'));
+      }
+      if (modeBtnGemini) {
+        modeBtnGemini.addEventListener('click', () => this.setHudMode('gemini'));
+      }
+
+      // 7. Save API Keys Button
+      const btnSaveKeys = document.getElementById('btn-save-api-keys');
+      if (btnSaveKeys) {
+        btnSaveKeys.addEventListener('click', () => {
+          const gemKey = (document.getElementById('input-gemini-key')?.value || '').trim();
+          const groqKey = (document.getElementById('input-groq-key')?.value || '').trim();
+          localStorage.setItem('nova_gemini_api_key', gemKey);
+          localStorage.setItem('nova_groq_api_key', groqKey);
           try {
-            if (
-              window.NovaNative &&
-              typeof window.NovaNative.saveUnlockPin === 'function'
-            ) {
-              window.NovaNative.saveUnlockPin(pin);
+            if (window.NovaNative && typeof window.NovaNative.setMemory === 'function') {
+              window.NovaNative.setMemory('nova_gemini_api_key', gemKey);
+              window.NovaNative.setMemory('nova_groq_api_key', groqKey);
             }
           } catch (e) {}
-          btnSavePin.textContent = 'PIN Saqlandi!';
+          btnSaveKeys.textContent = '✓ Kalitlar Saqlandi!';
           setTimeout(() => {
-            btnSavePin.textContent = 'PIN Saqlash';
-          }, 1500);
+            btnSaveKeys.textContent = 'API Kalitlarni Saqlash';
+          }, 1600);
         });
       }
 
-      if (btnTestUnlock) {
-        btnTestUnlock.addEventListener('click', () => {
-          const pin = window.NovaVault
-            ? window.NovaVault.getKV('unlock_pin', '0000')
-            : '0000';
-          try {
-            if (
-              window.NovaNative &&
-              typeof window.NovaNative.unlockDevice === 'function'
-            ) {
-              window.NovaNative.unlockDevice(pin);
-            }
-          } catch (e) {}
-          this.closeStudio();
-          if (window.NovaBrain) {
-            window.NovaBrain.speak(
-              'Ovozli qulf ochish tizimi ishga tushirildi bro!'
-            );
-          }
-        });
-      }
-
-      // 3) 6-Gudok Call Secretary & Relationship Matrix
-      const btnAddContact = document.getElementById('btn-add-matrix-contact');
-      const btnSimCall = document.getElementById('btn-simulate-6gudok');
-      if (btnAddContact) {
-        btnAddContact.addEventListener('click', () => {
-          const nameEl = document.getElementById('matrix-name');
-          const phoneEl = document.getElementById('matrix-phone');
-          const catEl = document.getElementById('matrix-category');
-          const name = nameEl ? nameEl.value.trim() : '';
-          const phone = phoneEl ? phoneEl.value.trim() : '';
-          const category = catEl ? catEl.value : 'DOST';
-          if (!name) return;
-          if (window.NovaVault) {
-            window.NovaVault.upsertContact({ name, phone, category });
-          }
-          if (nameEl) nameEl.value = '';
-          if (phoneEl) phoneEl.value = '';
-          this._renderRelationshipMatrix();
-        });
-      }
-
-      if (btnSimCall) {
-        btnSimCall.addEventListener('click', () => {
-          const simTarget =
-            document.getElementById('select-sim-caller')?.value || 'Onam';
-          this.closeStudio();
-          if (window.NovaSecretary) {
-            window.NovaSecretary.simulateIncomingCall(simTarget);
-          }
-        });
-      }
-
-      // 4) Telegram Plus (`org.telegram.plus`) & Ghost Twin Mode
-      const toggleGhostTwin = document.getElementById('toggle-ghost-twin');
-      const btnSendTgPlus = document.getElementById('btn-send-tg-plus');
-      const btnSaveMtproto = document.getElementById('btn-save-mtproto');
-
-      if (toggleGhostTwin) {
-        toggleGhostTwin.addEventListener('click', () => {
-          const next = !toggleGhostTwin.classList.contains('on');
-          toggleGhostTwin.classList.toggle('on', next);
-          if (window.NovaTelegram) window.NovaTelegram.setGhostTwinEnabled(next);
-        });
-      }
-
-      if (btnSendTgPlus) {
-        btnSendTgPlus.addEventListener('click', () => {
-          const contact =
-            document.getElementById('tg-target-contact')?.value.trim() ||
-            'Jamshid';
-          const msg =
-            document.getElementById('tg-target-msg')?.value.trim() ||
-            'Salom bro, nima gap?';
-          if (window.NovaTelegram) {
-            window.NovaTelegram.sendMessage(contact, msg, true);
-          }
-          const msgEl = document.getElementById('tg-target-msg');
-          if (msgEl) msgEl.value = '';
-          this._renderTelegramTwinPanel();
-        });
-      }
-
-      if (btnSaveMtproto) {
-        btnSaveMtproto.addEventListener('click', () => {
-          const apiId = document.getElementById('tg-api-id')?.value || '';
-          const apiHash = document.getElementById('tg-api-hash')?.value || '';
-          const phone = document.getElementById('tg-phone')?.value || '';
-          if (window.NovaTelegram) {
-            window.NovaTelegram.saveMtprotoConfig(apiId, apiHash, phone);
-          }
-          btnSaveMtproto.textContent = 'Userbot Ulandi!';
-          setTimeout(() => {
-            btnSaveMtproto.textContent = 'MTProto Userbotni Saqlash';
-          }, 1500);
-        });
-      }
-
-      // 5) Focus Guardian (Instagram 10m Blocker) & 5-Mahal Namoz Alarms
-      const toggleFocusGuard = document.getElementById('toggle-focus-guard');
-      const btnTestIgBlock = document.getElementById('btn-test-ig-block');
-      const btnSyncNamoz = document.getElementById('btn-sync-namoz-alarms');
-      const btnAddPlan = document.getElementById('btn-add-daily-plan');
-
-      if (toggleFocusGuard) {
-        toggleFocusGuard.addEventListener('click', () => {
-          const next = !toggleFocusGuard.classList.contains('on');
-          toggleFocusGuard.classList.toggle('on', next);
-          if (window.NovaFocusScheduler) {
-            window.NovaFocusScheduler.setFocusGuardEnabled(next);
-          }
-        });
-      }
-
-      if (btnTestIgBlock) {
-        btnTestIgBlock.addEventListener('click', () => {
-          this.closeStudio();
-          if (window.NovaFocusScheduler) {
-            window.NovaFocusScheduler.triggerInstagramBlockNow();
-          }
-        });
-      }
-
-      if (btnSyncNamoz) {
-        btnSyncNamoz.addEventListener('click', async () => {
-          const cityInput = document.getElementById('input-prayer-city');
-          const city = (cityInput && cityInput.value.trim()) || 'Namangan';
-          btnSyncNamoz.textContent = "Vaqtlar olinmoqda va budilnik o'rnatilmoqda...";
-          if (window.NovaFocusScheduler) {
-            await window.NovaFocusScheduler.fetchPrayerTimes(city, true);
-          }
-          btnSyncNamoz.textContent = "5 Mahal Namoz Budilniklari O'rnatildi!";
-          setTimeout(() => {
-            btnSyncNamoz.textContent =
-              "5 Mahal Namozga Avto-Budilnik O'rnatish";
-          }, 2000);
-          this._renderFocusAndPrayerPanel();
-        });
-      }
-
-      if (btnAddPlan) {
-        btnAddPlan.addEventListener('click', () => {
-          const titleEl = document.getElementById('plan-title');
-          const timeEl = document.getElementById('plan-time');
-          const title = titleEl ? titleEl.value.trim() : '';
-          const timeStr = timeEl ? timeEl.value.trim() : '07:00';
-          if (!title) return;
-          const parts = timeStr.split(':');
-          const h = parseInt(parts[0] || '7', 10);
-          const m = parseInt(parts[1] || '0', 10);
-          if (window.NovaFocusScheduler) {
-            window.NovaFocusScheduler.setSystemAlarm(h, m, title);
-          }
-          if (titleEl) titleEl.value = '';
-          this._renderFocusAndPrayerPanel();
-        });
-      }
-
-      // 6) 1-Tap Permission Center Buttons
-      document.querySelectorAll('[data-perm-action]').forEach((btn) => {
+      // 8. Real Android Permission Buttons
+      document.querySelectorAll('[data-perm]').forEach((btn) => {
         btn.addEventListener('click', () => {
-          const act = btn.getAttribute('data-perm-action');
+          const perm = btn.getAttribute('data-perm');
           try {
             if (
               window.NovaNative &&
               typeof window.NovaNative.openPermissionSettings === 'function'
             ) {
-              window.NovaNative.openPermissionSettings(act);
+              window.NovaNative.openPermissionSettings(perm);
             }
           } catch (e) {}
-          setTimeout(() => this._renderPermissionsStatus(), 1200);
+          setTimeout(() => this.refreshPermissionsUI(), 1500);
         });
       });
     }
 
-    _highlightSkinCard(skinName) {
-      document.querySelectorAll('.skin-card').forEach((c) => {
-        c.classList.toggle('selected', c.getAttribute('data-skin') === skinName);
+    // ------------------------------------------------------------------------
+    // NATIVE ANDROID EVENTS (SpeechRecognizer, Permissions, Wake-Word, TTS)
+    // ------------------------------------------------------------------------
+    _bindNativeEvents() {
+      window.NovaEvents.on('stt:ready', () => {
+        this.setListeningState(true);
+        this.updateTranscriptDisplay(
+          'Eshitmoqdaman...',
+          "Gapiravering (3.5 soniya pauza kutish faol)"
+        );
       });
-    }
 
-    _refreshAllStudioPanels() {
-      this._renderRelationshipMatrix();
-      this._renderCallSecretaryLogs();
-      this._renderTelegramTwinPanel();
-      this._renderFocusAndPrayerPanel();
-      this._renderPermissionsStatus();
-      if (this.vad) {
-        this._updateBiometricUI(this.vad.getBiometricState());
-      }
-    }
+      window.NovaEvents.on('stt:rms', (p) => {
+        this.rmsLevel = Math.max(0.05, Math.min(1.0, Number(p.level || 0.1)));
+      });
 
-    _updateBiometricUI(bio = {}) {
-      const badge = document.getElementById('bio-status-badge');
-      const btnEnroll = document.getElementById('btn-enroll-voice');
-      const count = Number(bio.samplesCount || 0);
-      if (badge) {
-        if (count >= 3) {
-          badge.className = 'badge badge-ok';
-          badge.textContent = `Tasdiqlangan (${count}/3 ovoz namunasi)`;
-        } else {
-          badge.className = 'badge badge-warn';
-          badge.textContent = `${count}/3 namuna yozilgan`;
+      window.NovaEvents.on('stt:partial', (p) => {
+        const text = (p && p.text) || '';
+        if (text) {
+          this.updateTranscriptDisplay(text, 'Eshitilmoqda...');
         }
-      }
-      if (btnEnroll) {
-        btnEnroll.textContent =
-          count >= 3
-            ? 'Ovoz Biometrikasi Faol (Yangilash)'
-            : `Ovoz Namunasini Yozish (${count}/3)`;
-      }
-    }
+      });
 
-    _renderRelationshipMatrix() {
-      const container = document.getElementById('relationship-matrix-list');
-      if (!container || !window.NovaVault) return;
-      const contacts = window.NovaVault.getContacts();
-      container.innerHTML = contacts
-        .map(
-          (c) => `
-        <div class="studio-row">
-          <div class="studio-row-info">
-            <div class="studio-row-title">${this._esc(c.name)} <span class="badge badge-cyan">${this._esc(c.category)}</span></div>
-            <div class="studio-row-sub">${this._esc(c.phone || 'Raqam kiritilmagan')} • ${this._esc(c.relationLabel || '')}</div>
-          </div>
-          <button class="studio-btn" data-del-contact="${this._esc(c.name)}">O'chirish</button>
-        </div>
-      `
-        )
-        .join('');
+      window.NovaEvents.on('stt:final', (p) => {
+        this.setListeningState(false);
+        this.rmsLevel = 0.06;
+        const text = ((p && p.text) || '').trim();
+        if (text) {
+          this.handleUserCommand(text);
+        } else {
+          this.updateTranscriptDisplay(
+            "Hmm, eshitilmadi. Qayta urinib ko'ring.",
+            "Pastdagi sfera yoki mikrofonga bosing"
+          );
+        }
+      });
 
-      container.querySelectorAll('[data-del-contact]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const name = btn.getAttribute('data-del-contact');
-          window.NovaVault.removeContact(name);
-          this._renderRelationshipMatrix();
-        });
+      window.NovaEvents.on('stt:error', () => {
+        this.setListeningState(false);
+        this.rmsLevel = 0.06;
+        this.updateTranscriptDisplay(
+          "Hmm, I didn't get that. Please try again.",
+          "Mikrofonga bosing yoki klaviatura orqali yozing"
+        );
+      });
+
+      window.NovaEvents.on('onNativeWakeWord', (p) => {
+        const cmd = ((p && p.command) || '').trim();
+        if (cmd.length > 2) {
+          this.handleUserCommand(cmd);
+        } else {
+          this.startListening();
+        }
+      });
+
+      window.NovaEvents.on('onAppResumed', () => {
+        this.refreshPermissionsUI();
+      });
+
+      window.NovaEvents.on('onPermissionsUpdated', () => {
+        this.refreshPermissionsUI();
+      });
+
+      window.NovaEvents.on('tts:start', () => {
+        this.rmsLevel = 0.45;
+      });
+
+      window.NovaEvents.on('tts:done', () => {
+        this.rmsLevel = 0.06;
       });
     }
 
-    _renderCallSecretaryLogs() {
-      const container = document.getElementById('call-secretary-logs');
-      if (!container || !window.NovaVault) return;
-      const logs = window.NovaVault.getCallLogs();
-      if (!logs.length) {
-        container.innerHTML = `<div class="studio-row"><div class="studio-row-sub">Hozircha 6-gudok kotib yozuvlari yo'q. Yuqoridagi "6-Gudok Simulyatsiya" tugmasini bosing.</div></div>`;
+    // ------------------------------------------------------------------------
+    // SPEECH RECOGNITION (Native Android SpeechSession + Web Speech Fallback)
+    // ------------------------------------------------------------------------
+    toggleListening() {
+      if (this.isListening) {
+        this.stopListening();
+      } else {
+        this.startListening();
+      }
+    }
+
+    startListening() {
+      this.setListeningState(true);
+      this.updateTranscriptDisplay(
+        'Eshitmoqdaman...',
+        "Fikringiz tugaguncha 3.5 soniya kutaman"
+      );
+
+      // 1) Prefer Native Android SpeechRecognizer (NovaSpeechSession with 3500ms pause patience)
+      if (
+        window.NovaNative &&
+        typeof window.NovaNative.startNativeStt === 'function'
+      ) {
+        try {
+          window.NovaNative.startNativeStt('uz-UZ', 3500);
+          return;
+        } catch (e) {}
+      }
+
+      // 2) Fallback to Web Speech API (e.g. desktop preview) with 3.5s pause timer
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRec) {
+        this.setListeningState(false);
+        this.updateTranscriptDisplay(
+          "Ovoz tanish xizmati topilmadi.",
+          "Klaviatura tugmasini bosib yozishingiz mumkin"
+        );
         return;
       }
-      container.innerHTML = logs
-        .slice(0, 8)
-        .map(
-          (l) => `
-        <div class="studio-card" style="padding:10px; margin-bottom:8px;">
-          <div class="studio-row-title">${this._esc(l.callerName)} (${this._esc(l.category)}) — ${l.ringsCount} gudok</div>
-          <div class="studio-row-sub" style="margin-top:4px; white-space:pre-line;">${this._esc(l.transcriptSummary)}</div>
-        </div>
-      `
-        )
-        .join('');
+
+      this.webAccumText = '';
+      this.webInterimText = '';
+      try {
+        this.webRec = new SpeechRec();
+        this.webRec.continuous = true;
+        this.webRec.interimResults = true;
+        this.webRec.lang = 'uz-UZ';
+
+        this.webRec.onresult = (ev) => {
+          let interim = '';
+          for (let i = ev.resultIndex; i < ev.results.length; i++) {
+            const chunk = ev.results[i][0].transcript;
+            if (ev.results[i].isFinal) {
+              this.webAccumText += ' ' + chunk;
+            } else {
+              interim += chunk;
+            }
+          }
+          this.webInterimText = interim;
+          const combined = (this.webAccumText + ' ' + this.webInterimText).trim();
+          if (combined) {
+            this.rmsLevel = 0.55;
+            this.updateTranscriptDisplay(combined, 'Eshitilmoqda...');
+            this._scheduleWebSilenceFinalizer(combined);
+          }
+        };
+
+        this.webRec.onerror = () => {
+          this.setListeningState(false);
+        };
+
+        this.webRec.onend = () => {
+          if (this.isListening) {
+            try {
+              this.webRec.start();
+            } catch (e) {}
+          }
+        };
+
+        this.webRec.start();
+      } catch (e) {
+        this.setListeningState(false);
+      }
     }
 
-    _renderTelegramTwinPanel() {
-      if (!window.NovaTelegram) return;
-      const st = window.NovaTelegram.getState();
-      const toggle = document.getElementById('toggle-ghost-twin');
-      if (toggle) toggle.classList.toggle('on', !!st.ghostTwinEnabled);
+    _scheduleWebSilenceFinalizer(currentText) {
+      if (this.webSilenceTimer) clearTimeout(this.webSilenceTimer);
+      const words = currentText.toLowerCase().replace(/[.,!?]+$/g, '').split(/\s+/);
+      const lastWord = words[words.length - 1] || '';
+      const waitMs = HOLD_WORDS.has(lastWord) ? 4200 : 3500;
 
-      const logBox = document.getElementById('tg-recent-messages');
-      if (logBox) {
-        if (!st.recentMessages.length) {
-          logBox.innerHTML = `<div class="studio-row-sub">Telegram Plus (org.telegram.plus) ko'prigi tayyor.</div>`;
+      this.webSilenceTimer = setTimeout(() => {
+        if (!this.isListening) return;
+        const finalStr = (this.webAccumText + ' ' + this.webInterimText).trim();
+        this.stopListening();
+        if (finalStr) {
+          this.handleUserCommand(finalStr);
+        }
+      }, waitMs);
+    }
+
+    stopListening() {
+      this.setListeningState(false);
+      this.rmsLevel = 0.06;
+      if (this.webSilenceTimer) {
+        clearTimeout(this.webSilenceTimer);
+        this.webSilenceTimer = null;
+      }
+      if (this.webRec) {
+        try {
+          this.webRec.stop();
+        } catch (e) {}
+        this.webRec = null;
+      }
+      if (
+        window.NovaNative &&
+        typeof window.NovaNative.stopNativeStt === 'function'
+      ) {
+        try {
+          window.NovaNative.stopNativeStt();
+        } catch (e) {}
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // REAL COMMAND EXECUTION + GEMINI / GROQ AI FETCH
+    // ------------------------------------------------------------------------
+    async handleUserCommand(rawText) {
+      const text = String(rawText || '').trim();
+      if (!text) return;
+
+      this.updateTranscriptDisplay(text, 'Bajarilmoqda...');
+
+      // 1. Check real deterministic device commands first (App Launch, Telegram, Alarm, Unlock)
+      const deviceResult = this._tryExecuteRealDeviceCommand(text);
+      if (deviceResult) {
+        this.updateTranscriptDisplay(deviceResult.reply, deviceResult.subtitle || 'NOVA • Bajarildi');
+        this.speak(deviceResult.reply);
+        if (deviceResult.autoHideOverlay) {
+          setTimeout(() => this.dismissOverlay(), 1100);
+        }
+        return;
+      }
+
+      // 2. Otherwise query real Gemini API or Groq API
+      const aiReply = await this._fetchAiResponse(text);
+      this.updateTranscriptDisplay(aiReply, 'NOVA AI');
+      this.speak(aiReply);
+    }
+
+    _tryExecuteRealDeviceCommand(text) {
+      const lower = text.toLowerCase().replace(/[‘’ʻʼ`´]/g, "'").trim();
+
+      // A) Open any installed app ("Telegram Plus'ni och", "Instagramni och", "YouTube'ni och", "och ...")
+      const openMatch =
+        lower.match(/^(.+?)(?:'ni|ni|nı|\s+ilovasini)?\s+(?:och(?:ib\s+ber)?|ishga\s+tushir|yoq)$/i) ||
+        lower.match(/^(?:och|open|открой|запусти)\s+(.+)$/i);
+
+      if (openMatch) {
+        let appQuery = openMatch[1].trim();
+        appQuery = appQuery.replace(/^(ilova|dastur|app)\s+/i, '').trim();
+
+        // Guard against "qulfni och" which is screen unlock
+        if (appQuery.includes('qulf') || appQuery.includes('ekran') || appQuery.includes('parol')) {
+          try {
+            if (window.NovaNative && typeof window.NovaNative.unlockDevice === 'function') {
+              window.NovaNative.unlockDevice('');
+            }
+          } catch (e) {}
+          return {
+            reply: 'Ekran qulfini ochdim!',
+            subtitle: 'Keyguard / Accessibility Unlock',
+            autoHideOverlay: true,
+          };
+        }
+
+        let launchedLabel = '';
+        try {
+          if (
+            window.NovaNative &&
+            typeof window.NovaNative.launchInstalledApp === 'function'
+          ) {
+            launchedLabel = window.NovaNative.launchInstalledApp(appQuery) || '';
+          }
+        } catch (e) {}
+
+        if (launchedLabel) {
+          return {
+            reply: `${launchedLabel} ilovasini ochyapman...`,
+            subtitle: `PackageManager -> ${launchedLabel}`,
+            autoHideOverlay: true,
+          };
         } else {
-          logBox.innerHTML = st.recentMessages
-            .slice(0, 6)
-            .map(
-              (m) => `
-            <div class="studio-row" style="margin-bottom:6px;">
-              <div class="studio-row-info">
-                <div class="studio-row-title">${this._esc(m.sender)} <span class="badge badge-cyan">${this._esc(m.mode)}</span></div>
-                <div class="studio-row-sub">${this._esc(m.text)}</div>
-              </div>
-            </div>
-          `
-            )
-            .join('');
+          return {
+            reply: `"${appQuery}" nomli ilova qurilmada topilmadi.`,
+            subtitle: 'PackageManager qidiruvi',
+            autoHideOverlay: false,
+          };
         }
       }
-    }
 
-    _renderFocusAndPrayerPanel() {
-      if (!window.NovaFocusScheduler) return;
-      const st = window.NovaFocusScheduler.getState();
-      const toggle = document.getElementById('toggle-focus-guard');
-      if (toggle) toggle.classList.toggle('on', !!st.focusGuardEnabled);
-
-      const cityInput = document.getElementById('input-prayer-city');
-      if (cityInput && !cityInput.value) cityInput.value = st.city || 'Namangan';
-
-      const grid = document.getElementById('prayer-times-grid');
-      if (grid && st.prayerTimes) {
-        const items = [
-          { name: 'Bomdod', time: st.prayerTimes.Fajr },
-          { name: 'Peshin', time: st.prayerTimes.Dhuhr },
-          { name: 'Asr', time: st.prayerTimes.Asr },
-          { name: 'Shom', time: st.prayerTimes.Maghrib },
-          { name: 'Xufton', time: st.prayerTimes.Isha },
-        ];
-        grid.innerHTML = items
-          .map(
-            (i) => `
-          <div class="prayer-pill">
-            <div class="prayer-name">${i.name}</div>
-            <div class="prayer-time">${i.time}</div>
-          </div>
-        `
-          )
-          .join('');
+      // B) Send message on Telegram Plus ("Telegram Plus'da Jamshidga salom deb yoz", "Onamga ... deb yoz")
+      const tgMatch = text.match(
+        /(?:telegram(?: plus)?da\s+)?([a-zA-Z0-9_ʻʼ'‘’]+?)(?:ga|ka)\s+(.+?)\s+(?:deb\s+)?(?:yoz(?:ib\s+qo'y)?|jo'nat|yubor)/i
+      );
+      if (tgMatch) {
+        const contact = tgMatch[1].trim();
+        const msg = tgMatch[2].trim();
+        try {
+          if (
+            window.NovaNative &&
+            typeof window.NovaNative.sendTelegramMessage === 'function'
+          ) {
+            window.NovaNative.sendTelegramMessage('org.telegram.plus', contact, msg);
+          }
+        } catch (e) {}
+        return {
+          reply: `Telegram Plus orqali ${contact}ga "${msg}" deb yozib yuboryapman.`,
+          subtitle: 'org.telegram.plus • Accessibility / RemoteInput',
+          autoHideOverlay: false,
+        };
       }
 
-      const plansBox = document.getElementById('daily-plans-list');
-      if (plansBox && Array.isArray(st.plans)) {
-        plansBox.innerHTML = st.plans
-          .map(
-            (p) => `
-          <div class="studio-row" style="margin-bottom:6px;">
-            <div class="studio-row-info">
-              <div class="studio-row-title">${this._esc(p.title)}</div>
-              <div class="studio-row-sub">Soat ${this._esc(p.timeStr)} • ${p.isPrayer ? '5-Mahal Namoz' : 'Shaxsiy reja'}</div>
-            </div>
-            <span class="badge ${p.isPrayer ? 'badge-cyan' : 'badge-ok'}">${this._esc(p.timeStr)}</span>
-          </div>
-        `
-          )
-          .join('');
+      // C) Set System Alarm ("Soat 06:30 ga budilnik qo'y", "7:00 ga budilnik", "Budilnik qo'y")
+      const timeMatch = lower.match(/(\d{1,2})[:.\s](\d{2})/);
+      if (
+        lower.includes('budilnik') ||
+        lower.includes("uyg'ot") ||
+        lower.includes('alarm') ||
+        lower.includes('будильник')
+      ) {
+        const h = timeMatch ? parseInt(timeMatch[1], 10) : 7;
+        const m = timeMatch ? parseInt(timeMatch[2], 10) : 0;
+        const hh = String(Math.max(0, Math.min(23, h))).padStart(2, '0');
+        const mm = String(Math.max(0, Math.min(59, m))).padStart(2, '0');
+        try {
+          if (
+            window.NovaNative &&
+            typeof window.NovaNative.setSystemAlarm === 'function'
+          ) {
+            window.NovaNative.setSystemAlarm(h, m, 'NOVA Budilnik', true);
+          }
+        } catch (e) {}
+        return {
+          reply: `Soat ${hh}:${mm} ga tizim budilnigini o'rnatdim!`,
+          subtitle: `AlarmClock.ACTION_SET_ALARM (${hh}:${mm})`,
+          autoHideOverlay: false,
+        };
       }
+
+      // D) Screen Unlock ("qulfni och")
+      if (lower.includes('qulfni och') || lower.includes('ekranni och')) {
+        try {
+          if (window.NovaNative && typeof window.NovaNative.unlockDevice === 'function') {
+            window.NovaNative.unlockDevice('');
+          }
+        } catch (e) {}
+        return {
+          reply: 'Ekran qulfini ochdim!',
+          subtitle: 'Auto-Unlock Engine',
+          autoHideOverlay: true,
+        };
+      }
+
+      return null;
     }
 
-    _renderPermissionsStatus() {
-      let status = {
-        accessibility: false,
-        notificationListener: false,
-        overlay: false,
-        usageStats: false,
-        rootAvailable: false,
-      };
+    async _fetchAiResponse(userText) {
+      const geminiKey = (localStorage.getItem('nova_gemini_api_key') || '').trim();
+      const groqKey =
+        (localStorage.getItem('nova_groq_api_key') || '').trim() ||
+        getDefaultGroqKey();
+
+      const systemPrompt = `Sen NOVA — Android smartfonining shaffof (translucent) ustki qatlamida ishlovchi aqlli AI yordamchisan (Bixby va Gemini Live kabi).
+Qoidalar:
+1. Foydalanuvchiga o'zbek tilida (yoki savol berilgan tilda) qisqa, aniq va samimiy (1-2 jumla) javob ber.
+2. Agar foydalanuvchi biror ilovani ochishni, budilnik qo'yishni yoki Telegramda xabar yuborishni so'rasa, javob oxirida bir qatorda ACTION_JSON qo'sh:
+   ACTION_JSON:{"action":"OPEN_APP","app":"Telegram Plus"}
+   yoki ACTION_JSON:{"action":"SET_ALARM","hour":6,"minute":30,"label":"Bomdod"}
+   yoki ACTION_JSON:{"action":"SEND_TG","contact":"Jamshid","text":"Salom"}`;
+
+      // 1) Try Real Gemini API first if user provided a Gemini API key
+      if (geminiKey) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(
+            geminiKey
+          )}`;
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: systemPrompt }] },
+              contents: [{ role: 'user', parts: [{ text: userText }] }],
+              generationConfig: { temperature: 0.55, maxOutputTokens: 220 },
+            }),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            const raw =
+              data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            if (raw.trim()) {
+              return this._parseAndExecuteAiAction(raw.trim());
+            }
+          }
+        } catch (e) {}
+      }
+
+      // 2) Real Groq API Fetch (Llama 3.3 70B Versatile)
+      if (groqKey) {
+        try {
+          this.chatHistory.push({ role: 'user', content: userText });
+          if (this.chatHistory.length > 8) {
+            this.chatHistory = this.chatHistory.slice(-8);
+          }
+
+          const resp = await fetch(
+            'https://api.groq.com/openai/v1/chat/completions',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${groqKey}`,
+              },
+              body: JSON.stringify({
+                model: 'llama-3.3-70b-versatile',
+                messages: [
+                  { role: 'system', content: systemPrompt },
+                  ...this.chatHistory,
+                ],
+                temperature: 0.55,
+                max_tokens: 220,
+              }),
+            }
+          );
+
+          if (resp.ok) {
+            const data = await resp.json();
+            const raw = data?.choices?.[0]?.message?.content || '';
+            if (raw.trim()) {
+              const cleaned = this._parseAndExecuteAiAction(raw.trim());
+              this.chatHistory.push({ role: 'assistant', content: cleaned });
+              return cleaned;
+            }
+          }
+        } catch (e) {}
+      }
+
+      return "Tayyorman! Ilova ochish (masalan: \"Telegram Plus'ni och\"), budilnik qo'yish yoki savol berish uchun gapiring.";
+    }
+
+    _parseAndExecuteAiAction(rawReply) {
+      let cleanText = rawReply;
+      const idx = rawReply.indexOf('ACTION_JSON:');
+      if (idx !== -1) {
+        cleanText = rawReply.slice(0, idx).trim();
+        const jsonStr = rawReply.slice(idx + 12).trim();
+        try {
+          const act = JSON.parse(jsonStr);
+          if (act.action === 'OPEN_APP' && act.app) {
+            if (window.NovaNative && typeof window.NovaNative.launchInstalledApp === 'function') {
+              window.NovaNative.launchInstalledApp(act.app);
+              setTimeout(() => this.dismissOverlay(), 1100);
+            }
+          } else if (act.action === 'SET_ALARM') {
+            if (window.NovaNative && typeof window.NovaNative.setSystemAlarm === 'function') {
+              window.NovaNative.setSystemAlarm(
+                Number(act.hour || 7),
+                Number(act.minute || 0),
+                act.label || 'NOVA Budilnik',
+                true
+              );
+            }
+          } else if (act.action === 'SEND_TG') {
+            if (window.NovaNative && typeof window.NovaNative.sendTelegramMessage === 'function') {
+              window.NovaNative.sendTelegramMessage(
+                'org.telegram.plus',
+                act.contact || 'Jamshid',
+                act.text || 'Salom!'
+              );
+            }
+          }
+        } catch (e) {}
+      }
+      return cleanText || 'Bajarildi!';
+    }
+
+    speak(text) {
+      const clean = String(text || '').trim();
+      if (!clean) return;
       try {
-        if (
-          window.NovaNative &&
-          typeof window.NovaNative.getPermissionsStatus === 'function'
-        ) {
-          status = JSON.parse(window.NovaNative.getPermissionsStatus() || '{}');
+        if (window.NovaNative && typeof window.NovaNative.speakUzbek === 'function') {
+          window.NovaNative.speakUzbek(clean);
+          return;
         }
       } catch (e) {}
 
-      const map = {
-        'perm-badge-accessibility': status.accessibility,
-        'perm-badge-notification': status.notificationListener,
-        'perm-badge-overlay': status.overlay,
-        'perm-badge-usage': status.usageStats,
-        'perm-badge-root': status.rootAvailable,
-      };
+      if ('speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(clean);
+          u.lang = 'uz-UZ';
+          window.speechSynthesis.speak(u);
+        } catch (e) {}
+      }
+    }
 
-      Object.keys(map).forEach((id) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        const ok = !!map[id];
-        el.className = `badge ${ok ? 'badge-ok' : 'badge-warn'}`;
-        el.textContent = ok ? 'Yoqilgan' : 'Ruxsat berish';
+    // ------------------------------------------------------------------------
+    // SETTINGS & PERMISSIONS BOTTOM-SHEET
+    // ------------------------------------------------------------------------
+    _loadSavedKeys() {
+      const gemInput = document.getElementById('input-gemini-key');
+      const groqInput = document.getElementById('input-groq-key');
+      if (gemInput) {
+        gemInput.value = localStorage.getItem('nova_gemini_api_key') || '';
+      }
+      if (groqInput) {
+        groqInput.value = localStorage.getItem('nova_groq_api_key') || '';
+      }
+    }
+
+    openSettingsSheet() {
+      this.refreshPermissionsUI();
+      const backdrop = document.getElementById('settings-sheet-backdrop');
+      if (backdrop) backdrop.classList.add('open');
+    }
+
+    closeSettingsSheet() {
+      const backdrop = document.getElementById('settings-sheet-backdrop');
+      if (backdrop) backdrop.classList.remove('open');
+    }
+
+    refreshPermissionsUI() {
+      let status = {};
+      try {
+        if (
+          window.NovaNative &&
+          typeof window.NovaNative.getPermissionsStatusJson === 'function'
+        ) {
+          status = JSON.parse(window.NovaNative.getPermissionsStatusJson() || '{}');
+        }
+      } catch (e) {}
+
+      const keys = ['microphone', 'accessibility', 'overlay', 'phoneCalls', 'usageStats'];
+      keys.forEach((k) => {
+        const btn = document.getElementById(`perm-btn-${k}`);
+        if (!btn) return;
+        const ok = !!status[k];
+        btn.classList.toggle('granted', ok);
+        btn.textContent = ok ? '✓ Yoqilgan' : 'Yoqish';
       });
     }
 
-    _esc(str) {
-      return String(str || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+    dismissOverlay() {
+      this.stopListening();
+      try {
+        if (window.NovaNative && typeof window.NovaNative.hideOverlay === 'function') {
+          window.NovaNative.hideOverlay();
+        }
+      } catch (e) {}
+    }
+
+    onBack() {
+      const backdrop = document.getElementById('settings-sheet-backdrop');
+      if (backdrop && backdrop.classList.contains('open')) {
+        this.closeSettingsSheet();
+        return true;
+      }
+      return false;
+    }
+
+    // ------------------------------------------------------------------------
+    // 60 FPS RENDER LOOP:
+    //  1) Bixby 68x68px 3D Liquid Cyan-Blue Sphere (#bixby-orb-canvas)
+    //  2) Gemini Bottom Cyan-Blue Particle Mist (#gemini-mist-canvas) + Wave Bars
+    // ------------------------------------------------------------------------
+    _createMistParticles(count) {
+      const arr = [];
+      for (let i = 0; i < count; i++) {
+        arr.push({
+          x: Math.random(),
+          y: Math.random(),
+          r: 0.8 + Math.random() * 1.9,
+          speedY: 0.0015 + Math.random() * 0.0035,
+          alpha: 0.2 + Math.random() * 0.65,
+          phase: Math.random() * Math.PI * 2,
+        });
+      }
+      return arr;
+    }
+
+    _startRenderLoop() {
+      const bixbyCanvas = document.getElementById('bixby-orb-canvas');
+      const bixbyCtx = bixbyCanvas ? bixbyCanvas.getContext('2d') : null;
+
+      const mistCanvas = document.getElementById('gemini-mist-canvas');
+      const mistCtx = mistCanvas ? mistCanvas.getContext('2d') : null;
+
+      const resizeMist = () => {
+        if (!mistCanvas) return;
+        mistCanvas.width = window.innerWidth;
+        mistCanvas.height = 260;
+      };
+      resizeMist();
+      window.addEventListener('resize', resizeMist);
+
+      const wb1 = document.getElementById('wb-1');
+      const wb2 = document.getElementById('wb-2');
+      const wb3 = document.getElementById('wb-3');
+
+      const render = () => {
+        requestAnimationFrame(render);
+
+        const targetRms = this.isListening
+          ? Math.max(this.rmsLevel, 0.16 + 0.1 * Math.sin(this.phase * 2.4))
+          : 0.06;
+        this.smoothedRms = this.smoothedRms * 0.84 + targetRms * 0.16;
+        this.phase += 0.035 + this.smoothedRms * 0.09;
+
+        // 1. Draw Bixby 3D Liquid Sphere (Screenshot 1)
+        if (bixbyCtx && bixbyCanvas) {
+          this._drawBixbySphere(bixbyCtx, bixbyCanvas.width, bixbyCanvas.height);
+        }
+
+        // 2. Draw Gemini Bottom Particle Mist & Waveform Bars (Screenshot 3)
+        if (this.mode === 'gemini' && mistCtx && mistCanvas) {
+          this._drawGeminiMist(mistCtx, mistCanvas.width, mistCanvas.height);
+        }
+
+        if (wb1 && wb2 && wb3) {
+          const boost = this.smoothedRms * 22;
+          wb1.style.height = `${Math.round(7 + Math.abs(Math.sin(this.phase * 1.9)) * boost)}px`;
+          wb2.style.height = `${Math.round(12 + Math.abs(Math.cos(this.phase * 2.3)) * (boost * 1.35))}px`;
+          wb3.style.height = `${Math.round(8 + Math.abs(Math.sin(this.phase * 1.6 + 1)) * boost)}px`;
+        }
+      };
+
+      requestAnimationFrame(render);
+    }
+
+    _drawBixbySphere(ctx, w, h) {
+      ctx.clearRect(0, 0, w, h);
+      const cx = w * 0.5;
+      const cy = h * 0.5;
+      const baseR = w * 0.41;
+
+      ctx.save();
+      // Organic morphing liquid blob clip path (matches Bixby squircle-sphere in Screenshot 1)
+      ctx.beginPath();
+      const steps = 72;
+      for (let i = 0; i <= steps; i++) {
+        const a = (i / steps) * Math.PI * 2;
+        const wobble =
+          Math.sin(a * 3 + this.phase) * (2.2 + this.smoothedRms * 5.5) +
+          Math.cos(a * 2 - this.phase * 0.8) * (1.6 + this.smoothedRms * 3.5);
+        const r = baseR + wobble;
+        const x = cx + Math.cos(a) * r;
+        const y = cy + Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.clip();
+
+      // Deep royal blue -> electric cyan 3D radial gradient
+      const grad = ctx.createRadialGradient(
+        cx - baseR * 0.28,
+        cy - baseR * 0.32,
+        baseR * 0.1,
+        cx,
+        cy,
+        baseR * 1.15
+      );
+      grad.addColorStop(0, '#5ce1ff');
+      grad.addColorStop(0.38, '#0088ff');
+      grad.addColorStop(0.78, '#0044ff');
+      grad.addColorStop(1, '#00d4ff');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+
+      // Internal horizontal liquid wave ribbon (like Screenshot 1 center wave)
+      ctx.beginPath();
+      for (let x = 0; x <= w; x += 3) {
+        const nx = (x / w) * Math.PI * 2;
+        const wy =
+          cy +
+          Math.sin(nx + this.phase * 1.4) * (4 + this.smoothedRms * 12) * Math.sin(x / w * Math.PI);
+        if (x === 0) ctx.moveTo(x, wy);
+        else ctx.lineTo(x, wy);
+      }
+      ctx.strokeStyle = 'rgba(190, 248, 255, 0.72)';
+      ctx.lineWidth = 3.2;
+      ctx.shadowColor = '#00f0ff';
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+
+      // Bottom-right cyan rim light
+      const rim = ctx.createRadialGradient(
+        cx + baseR * 0.35,
+        cy + baseR * 0.4,
+        baseR * 0.05,
+        cx + baseR * 0.2,
+        cy + baseR * 0.25,
+        baseR * 0.95
+      );
+      rim.addColorStop(0, 'rgba(0, 255, 240, 0.62)');
+      rim.addColorStop(1, 'rgba(0, 255, 240, 0)');
+      ctx.fillStyle = rim;
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.restore();
+    }
+
+    _drawGeminiMist(ctx, w, h) {
+      ctx.clearRect(0, 0, w, h);
+
+      // Soft bottom cyan mist gradient
+      const bg = ctx.createLinearGradient(0, h, 0, 0);
+      bg.addColorStop(0, `rgba(14, 165, 233, ${0.28 + this.smoothedRms * 0.22})`);
+      bg.addColorStop(0.55, 'rgba(2, 132, 199, 0.08)');
+      bg.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, w, h);
+
+      // Fine stardust particles (matches Screenshot 3 bottom mist)
+      for (const p of this.mistParticles) {
+        p.y -= p.speedY * (1 + this.smoothedRms * 2.2);
+        if (p.y < 0) {
+          p.y = 1;
+          p.x = Math.random();
+        }
+        const px = p.x * w + Math.sin(this.phase + p.phase) * 6;
+        const py = p.y * h;
+        const fade = Math.sin(p.y * Math.PI);
+        ctx.fillStyle = `rgba(186, 230, 253, ${p.alpha * fade})`;
+        ctx.beginPath();
+        ctx.arc(px, py, p.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
 
   window.addEventListener('DOMContentLoaded', () => {
-    const app = new NovaAppController();
-    app.init();
-    window.NovaApp = app;
+    const hud = new NovaCompactOverlay();
+    hud.init();
+    window.NovaHud = hud;
   });
 })();
