@@ -42,19 +42,19 @@ jobs:
       - name: Build AURA Music APK (API 26 - API 35)
         working-directory: android
         run: |
-          gradle assembleDebug --stacktrace 2>&1 | tee build.log
-
-      - name: Upload Build Log on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Gradle-Build-Log
-          path: android/build.log
+          gradle assembleDebug --stacktrace
 
       - name: Package APK Files
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk Aura-Music.apk
-          cp android/app/build/outputs/apk/debug/app-debug.apk Aura-v1.0.apk
+          find android/app/build/outputs -name "*.apk" -exec ls -lh {} +
+          APK_PATH=$(find android/app/build/outputs -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "Error: No APK found!"
+            exit 1
+          fi
+          echo "Packaging APK from $APK_PATH"
+          cp "$APK_PATH" Aura-Music.apk
+          cp "$APK_PATH" Aura-v1.0.apk
 
       - name: Upload Aura-Music.apk Artifact
         uses: actions/upload-artifact@v4
