@@ -44,18 +44,16 @@ jobs:
         run: |
           gradle assembleDebug --stacktrace > ../gradle-output.txt 2>&1 || true
 
-      - name: Always Upload Gradle Output
-        uses: actions/upload-artifact@v4
-        with:
-          name: gradle-output
-          path: gradle-output.txt
-
-      - name: Verify Build Succeeded
+      - name: Verify and Print Build Output
         run: |
-          if ! grep -q "BUILD SUCCESSFUL" gradle-output.txt; then
-            echo "Gradle failed!"
-            exit 1
-          fi
+          echo "### Gradle Build Output" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat gradle-output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "==================== FULL GRADLE OUTPUT ===================="
+          cat gradle-output.txt
+          echo "============================================================"
+          grep "BUILD SUCCESSFUL" gradle-output.txt
 
       - name: Package APK Files
         run: |
