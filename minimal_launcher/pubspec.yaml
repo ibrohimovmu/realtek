@@ -1,7 +1,7 @@
 name: minimal_launcher
-description: "Minimalist, animation-rich Android Home Launcher with Crescent Wheel, Realistic Cat & AI Wallpapers."
+description: "Minimalist, animation-rich Android Home Launcher with Nova AI Assistant, Telegram Voice Messaging, Crescent Wheel & Realistic Cat."
 publish_to: 'none'
-version: 2.0.0+2
+version: 3.0.0+3
 
 environment:
   sdk: ^3.12.0

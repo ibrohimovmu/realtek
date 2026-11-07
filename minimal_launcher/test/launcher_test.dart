@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:minimal_launcher/models/app_info.dart';
+import 'package:minimal_launcher/services/ai_assistant_service.dart';
 
 void main() {
   group('LauncherLogic weekStrip tests', () {
@@ -36,7 +37,6 @@ void main() {
       expect(center.scale, closeTo(1.08, 0.01));
       expect(center.opacity, equals(1.0));
       expect(center.dy, closeTo(250.0, 0.1));
-      // Center protrudes further right on left-side crescent than top/bottom edges
       expect(center.dx, greaterThan(topEdge.dx));
       expect(center.scale, greaterThan(topEdge.scale));
       expect(center.opacity, greaterThan(topEdge.opacity));
@@ -57,6 +57,53 @@ void main() {
       expect(LauncherLogic.formatDurationUz(0), equals('0 daq'));
       expect(LauncherLogic.formatDurationUz(15 * 60000), equals('15 daq'));
       expect(LauncherLogic.formatDurationUz(125 * 60000), equals('2 soat 5 daq'));
+    });
+  });
+
+  group('AiAssistantService Telegram & hardware command parser tests', () {
+    test('parses "Telegramga kirib Akmalga 10 daqiqada boraman deb yoz"', () {
+      final res = AiAssistantService.parseLocalCommand(
+        'Telegramga kirib Akmalga 10 daqiqada boraman deb yoz',
+      );
+      expect(res, isNotNull);
+      expect(res!['action'], equals('send_telegram'));
+      expect(res['recipient'], equals('Akmal'));
+      expect(res['message'], equals('10 daqiqada boraman'));
+    });
+
+    test('parses "Telegramdan @nthnto ga salom loyiha tayyor deb yozib yubor"', () {
+      final res = AiAssistantService.parseLocalCommand(
+        'Telegramdan @nthnto ga salom loyiha tayyor deb yozib yubor',
+      );
+      expect(res, isNotNull);
+      expect(res!['action'], equals('send_telegram'));
+      expect(res['recipient'], equals('@nthnto'));
+      expect(res['message'], equals('salom loyiha tayyor'));
+    });
+
+    test('parses "Oyimga telegramda ovqat tayyormi deb yoz"', () {
+      final res = AiAssistantService.parseLocalCommand(
+        'Oyimga telegramda ovqat tayyormi deb yoz',
+      );
+      expect(res, isNotNull);
+      expect(res!['action'], equals('send_telegram'));
+      expect(res['recipient'], equals('Oyim'));
+      expect(res['message'], equals('ovqat tayyormi'));
+    });
+
+    test('parses flashlight, volume, and alarm commands', () {
+      final flash = AiAssistantService.parseLocalCommand('Fonarikni yoq');
+      expect(flash?['action'], equals('set_flashlight'));
+      expect(flash?['enabled'], isTrue);
+
+      final vol = AiAssistantService.parseLocalCommand('Ovozni 80 foiz qil');
+      expect(vol?['action'], equals('set_volume'));
+      expect(vol?['percent'], equals(80));
+
+      final alarm = AiAssistantService.parseLocalCommand('Soat 07:30 ga budilnik qo\'y');
+      expect(alarm?['action'], equals('set_alarm'));
+      expect(alarm?['hour'], equals(7));
+      expect(alarm?['minute'], equals(30));
     });
   });
 

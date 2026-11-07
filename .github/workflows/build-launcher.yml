@@ -49,7 +49,7 @@ jobs:
       - name: Copy Universal APK
         run: |
           mkdir -p output_launcher_apks
-          cp minimal_launcher/build/app/outputs/flutter-apk/app-release.apk output_launcher_apks/MinimalLauncher-v2.0-Universal.apk
+          cp minimal_launcher/build/app/outputs/flutter-apk/app-release.apk output_launcher_apks/MinimalLauncher-v3.0-Universal.apk
 
       - name: Build Split per ABI APKs
         working-directory: minimal_launcher
@@ -57,14 +57,14 @@ jobs:
 
       - name: Copy Split APKs
         run: |
-          cp minimal_launcher/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk output_launcher_apks/MinimalLauncher-v2.0-arm64.apk || true
-          cp minimal_launcher/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk output_launcher_apks/MinimalLauncher-v2.0-armeabi.apk || true
+          cp minimal_launcher/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk output_launcher_apks/MinimalLauncher-v3.0-arm64.apk || true
+          cp minimal_launcher/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk output_launcher_apks/MinimalLauncher-v3.0-armeabi.apk || true
           ls -lh output_launcher_apks
 
       - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: MinimalLauncher-v2-APKs
+          name: MinimalLauncher-v3-APKs
           path: output_launcher_apks/*.apk
           retention-days: 14
 
@@ -72,22 +72,23 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: launcher-v2.0.0
-          name: "Minimal Launcher v2.0.0 (Yarim Oy, AI Fonlar, Faollik Tarixi & Haqiqiy Mushukcha)"
+          tag_name: launcher-v3.0.0
+          name: "Minimal Launcher v3.0.0 (Nova AI Assistent + Telegram Ovozli Yozish + Bixby/Google Minimalist To'lqin)"
           body: |
-            ## 🌙 Minimal Launcher v2.0.0 — Katta Yangilanish
+            ## ✨ Minimal Launcher v3.0.0 — Nova AI Assistent (Siri, Bixby va Google Assistant'dan ustun!)
 
-            Foydalanuvchi talablari asosida tubdan boyitilgan, yarim oy shaklida aylanuvchi va to'liq moslashtiriluvchi (customizable) Android Launcher.
-
-            ### ✨ Yangi imkoniyatlar (v2.0.0):
-            - **🌙 Yarim Oy (Crescent Arc) Aylanma Menyu:** Pastdan chiqadigan oyna o'rniga asosiy ekranning o'zida yarim oy shaklida silliq aylanadigan ilovalar g'ildiragi (`Hammasi`, `Asosiy ★`, `Oxirgi 🕒`, `Ko'p kirilgan 🔥` filtrlari va tezkor qidiruv bilan).
-            - **🐈‍⬛ Kichikroq va Haqiqiy Qora Mushukcha:** Tabiiy mushuk anatomiyasi, vertikal qorachiqli qahrabo/zumrad/oq ko'zlar, barmoq harakatini kuzatish, o'lchamini va ko'z rangini o'zgartirish imkoniyati.
-            - **📊 Faollik va Kirilgan Ilovalar Tarixi Markazi:** Qaysi ilovaga soat nechada kirilganligi (Timeline), eng ko'p ishlatilgan ilovalar statistikasi, ekran vaqti (`UsageStatsManager`), Maxfiy (Incognito) rejim va Yashirin ilovalar ombori.
-            - **🎨 4-Bo'limli Shaxsiylashtirish Studiyasi:**
-              - **6 xil Kreativ HD Orqa Fon** + **AI Orqa Fon Yaratuvchi** + **Galereyadan rasm tanlash** + **6 xil 60fps Jonli San'at sahnasi**.
-              - **6 xil Soat uslubi** (`Minimal Klassik`, `3D Flip Soat`, `Bauhaus Analog`, `Katta Vertikal`, `Kiber HUD`, `Shaffof Kapsula`).
-              - **6 xil Ikonka uslubi** (`Qora Doira`, `Muzlatilgan Oyna`, `Neon Halqa`, `Tabiiy Rangli`, `Oq-Qora`, `Faqat Yozuv`).
-              - **7 xil Atrof-muhit Effekti** (`Chang`, `Tungi Qo'ng'izlar`, `Sakura`, `Kosmos`, `Qor`, `Matrix`).
+            ### 🚀 Yangi AI Assistent Imkoniyatlari (v3.0.0):
+            - **💬 Telegramga Ovoz yoki Matn Bilan Xabar Yozish (`send_telegram`):**
+              - *"Telegramga kirib Akmalga 10 daqiqada boraman deb yoz"* yoki *"Telegramdan @nthnto ga salom loyiha tayyor deb yozib yubor"* desangiz:
+              - Telefon kontaktlaringizdan (`ContactsContract`) yoki saqlangan `@username` xotirasidan odamni avtomatik topadi, Telegram'da uning chatini ochib xabarni yozadi, va **Nova Avto-Yuborish (Accessibility)** yoqilgan bo'lsa **Send (`Yuborish`)** tugmasini ham o'zi bosib yuboradi!
+              - Bot obunachilari uchun esa fon rejimida (`Telegram Bot API`) ekranga tegmasdan ham xabar jo'natadi.
+            - **🌊 "Hi Bixby" / "Hey Google" / "Salom Nova" — Ultra-Minimalist Chaqiruv:**
+              - Bo'rtirib yuborilmagan, nafis minimalizm: ekran ostidan **60fps suyuq ipak nurlar to'lqini (`Edge Silk Wave`)** va ixcham **muzlatilgan oyna kapsulasi (`Floating Glass Capsule`)** silliq suzib chiqadi.
+              - Ovoz balandligiga qarab jonli harakatlanuvchi garmonik to'lqin va sukutni avtomatik sezish (`Auto-Silence VAD`).
+            - **🧠 Groq Whisper-v3-Turbo + GPT-OSS 120B / Qwen 3.8 + CoreAI UZ Quvvati:**
+              - O'zbek, rus va ingliz tillarida ovozni 99% aniqlikda tushunadi hamda tabiiy ovozda (`TTS`) javob qaytaradi.
+            - **📱 Qurilmani To'liq Boshqarish:**
+              - *"Fonarikni yoq / o'chir"*, *"Ovozni 80 foiz qil"*, *"Soat 07:30 ga budilnik qo'y"*, *"5 daqiqaga taymer qo'y"*, *"YouTube'dan ... qidir"*, *"Akmalga telefon qil"*, *"Orqa fonga ... chizib ber"*, *"Bugun qaysi ilovalarga ko'p kirdim?"*.
           files: output_launcher_apks/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

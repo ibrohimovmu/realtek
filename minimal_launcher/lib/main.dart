@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'screens/home_screen.dart';
+import 'services/ai_assistant_service.dart';
 import 'services/launcher_store.dart';
 
 void main() async {
@@ -22,8 +23,9 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Load favorites, background, settings, and installed applications
+  // Load favorites, background, settings, installed applications, and Nova AI Assistant
   await LauncherStore.i.init();
+  await AiAssistantService.i.init();
 
   runApp(const MinimalLauncherApp());
 }

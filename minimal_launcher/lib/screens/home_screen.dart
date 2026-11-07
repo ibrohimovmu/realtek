@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/ai_assistant_service.dart';
 import '../services/launcher_store.dart';
 import '../widgets/activity_sheet.dart';
+import '../widgets/ai_assistant_overlay.dart';
 import '../widgets/ambient_layer.dart';
 import '../widgets/clock_header.dart';
 import '../widgets/crescent_wheel.dart';
@@ -42,6 +44,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       LauncherStore.i.refreshSystemInfo();
       LauncherStore.i.refreshUsageStats();
+      AiAssistantService.i.refreshPermissionsAndStatus();
     }
   }
 
@@ -65,8 +68,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (AiAssistantService.i.isOverlayVisible) {
+          AiAssistantService.i.dismissAssistant();
+        }
+      },
       child: AnimatedBuilder(
-        animation: LauncherStore.i,
+        animation: Listenable.merge([LauncherStore.i, AiAssistantService.i]),
         builder: (context, _) {
           final store = LauncherStore.i;
           final isDark = store.isDark;
@@ -132,7 +140,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           if (store.showRecentStrip)
                             _buildBottomRecentDock(context, store, ink, isDark),
 
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 10),
                         ],
                       ),
                     ),
@@ -148,6 +156,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           onLeftEdge: !store.wheelLeftSide,
                         ),
                       ),
+
+                    // 4. Ultra-Minimalist Bixby / Google Assistant Edge Wave & Floating Capsule
+                    Positioned.fill(
+                      child: AiAssistantOverlay(
+                        ink: ink,
+                        isDark: isDark,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -164,13 +180,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     Color ink,
     bool isDark,
   ) {
-    final recents = store.recentApps.take(5).toList();
+    final recents = store.recentApps.take(4).toList();
     final dockBg = (isDark ? Colors.black : Colors.white).withValues(alpha: 0.14);
+    final ai = AiAssistantService.i;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
         decoration: BoxDecoration(
           color: dockBg,
           borderRadius: BorderRadius.circular(24),
@@ -179,6 +196,72 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Sleek Minimalist Nova AI Orb Trigger ("Hi Bixby / Hey Google" style)
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                ai.summonAssistant(autoListen: true);
+              },
+              onLongPress: () {
+                HapticFeedback.heavyImpact();
+                ai.setWakeWord(!ai.wakeWordEnabled);
+              },
+              child: Tooltip(
+                message: 'Nova AI (Hi Bixby / Hey Google)',
+                child: Container(
+                  height: 34,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFF5CE0D8).withValues(alpha: isDark ? 0.24 : 0.28),
+                        const Color(0xFFA98BFF).withValues(alpha: isDark ? 0.18 : 0.22),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: ai.wakeWordEnabled
+                          ? const Color(0xFF5CE0D8).withValues(alpha: 0.65)
+                          : ink.withValues(alpha: 0.16),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.auto_awesome_rounded,
+                        size: 15,
+                        color: isDark ? const Color(0xFF5CE0D8) : ink,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'AI',
+                        style: TextStyle(
+                          color: ink,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      if (ai.wakeWordEnabled) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          width: 5,
+                          height: 5,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF5CE08A),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 6),
+
             // Activity / Usage History quick icon
             GestureDetector(
               onTap: () {
@@ -203,12 +286,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               Container(
                 width: 1,
                 height: 20,
-                margin: const EdgeInsets.symmetric(horizontal: 8),
+                margin: const EdgeInsets.symmetric(horizontal: 7),
                 color: ink.withValues(alpha: 0.18),
               ),
               ...recents.map((app) {
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 3.5),
                   child: GestureDetector(
                     onTap: () {
                       HapticFeedback.lightImpact();
@@ -246,7 +329,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             Container(
               width: 1,
               height: 20,
-              margin: const EdgeInsets.symmetric(horizontal: 8),
+              margin: const EdgeInsets.symmetric(horizontal: 7),
               color: ink.withValues(alpha: 0.18),
             ),
 
@@ -274,7 +357,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ),
 
-            const SizedBox(width: 6),
+            const SizedBox(width: 5),
 
             // Customization Studio button
             GestureDetector(
