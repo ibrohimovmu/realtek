@@ -14,9 +14,14 @@ import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.AlarmClock;
 import android.provider.MediaStore;
 import android.provider.Settings;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.view.View;
@@ -41,28 +46,65 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * NOVA compact assistant overlay.
+ * NOVA 100% Translucent Compact Overlay Activity (MainActivity.java).
  *
- * The activity is 100% translucent (Theme.Translucent.NoTitleBar + transparent window +
- * transparent WebView), so the launcher / current app stays visible behind the HUD.
- * Only the bottom HUD (Bixby mini card or Gemini edge-glow capsule) is drawn by the web layer.
+ * - Runs with Theme.Translucent.NoTitleBar + Color.TRANSPARENT window & WebView.
+ * - Does NOT run any background microphone service (no stuck mic icon in status bar).
+ * - Implements 100% Native Android SpeechRecognizer directly in MainActivity:
+ *     * NovaBridge.startNativeListening("uz-UZ")
+ *     * window.onNativeSpeech(text, isFinal)
+ *     * window.onVoiceLevel(rmsdB)
+ *     * Seamless auto-continue on ERROR_NO_MATCH / ERROR_SPEECH_TIMEOUT (no "Hmm, eshitilmadi" box).
  */
 public class MainActivity extends Activity implements TextToSpeech.OnInitListener {
 
     private static final int REQ_MIC = 5002;
     private static final int REQ_PHONE = 5003;
+    private static final long PAUSE_FINALIZE_MS = 3500L;
 
     private static MainActivity activeInstance;
     private static volatile boolean micClaimedByWebView = false;
 
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private WebView webView;
     private TextToSpeech tts;
     private boolean ttsReady = false;
     private boolean pageReady = false;
-    private NovaSpeechSession speechSession;
+
+    // 100% Native SpeechRecognizer state inside MainActivity
+    private SpeechRecognizer speechRecognizer;
+    private boolean isNativeListening = false;
+    private boolean recognizerActive = false;
+    private String listeningLang = "uz-UZ";
+    private final StringBuilder accumulatedSpeech = new StringBuilder();
+    private String currentPartial = "";
+    private long lastRmsDispatchMs = 0L;
+
+    private final Runnable restartRecognizerTask = new Runnable() {
+        @Override
+        public void run() {
+            if (isNativeListening) {
+                startRecognizerPassInternal();
+            }
+        }
+    };
+
+    private final Runnable finalizeSpeechTask = new Runnable() {
+        @Override
+        public void run() {
+            String full = getCombinedSpeechText();
+            if (!full.isEmpty()) {
+                isNativeListening = false;
+                stopRecognizerPassInternal();
+                accumulatedSpeech.setLength(0);
+                currentPartial = "";
+                dispatchNativeSpeechToJs(full, true);
+            }
+        }
+    };
 
     // ------------------------------------------------------------------------
-    // Static helpers used by services
+    // Static helpers
     // ------------------------------------------------------------------------
     public static boolean isWebViewActive() {
         return activeInstance != null;
@@ -74,9 +116,6 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
 
     public static void setMicClaimedByWebView(boolean claimed) {
         micClaimedByWebView = claimed;
-        if (claimed) {
-            NovaVoiceForegroundService.yieldMicNow();
-        }
     }
 
     public static void notifyJsEvent(final String eventName, final String jsonPayload) {
@@ -104,6 +143,11 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         activeInstance = this;
         configureTransparentWindow();
 
+        // Ensure no background service holds the microphone
+        try {
+            stopService(new Intent(this, NovaVoiceForegroundService.class));
+        } catch (Throwable ignored) {}
+
         try {
             tts = new TextToSpeech(this, this);
         } catch (Throwable ignored) {}
@@ -126,7 +170,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
         s.setTextZoom(100);
 
-        webView.addJavascriptInterface(new NovaBridge(this), "NovaNative");
+        NovaBridge bridge = new NovaBridge(this);
+        webView.addJavascriptInterface(bridge, "NovaBridge");
+        webView.addJavascriptInterface(bridge, "NovaNative");
 
         final WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
                 .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
@@ -142,7 +188,11 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 pageReady = true;
-                handleWakeIntent(getIntent());
+                if (hasMic()) {
+                    startNativeListening("uz-UZ");
+                } else {
+                    requestMicPermission();
+                }
             }
         });
 
@@ -158,12 +208,6 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         });
 
         webView.loadUrl("https://appassets.androidplatform.net/assets/public/index.html");
-
-        if (!hasMic()) {
-            requestMicPermission();
-        } else {
-            startHandsFreeIfConfigured();
-        }
     }
 
     private void configureTransparentWindow() {
@@ -177,7 +221,11 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             w.setNavigationBarContrastEnforced(false);
             w.setStatusBarContrastEnforced(false);
         }
-        w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        // Keep soft keyboard hidden unless user explicitly opens an input in Settings
+        w.setSoftInputMode(
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+                        | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN
+        );
         w.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -191,23 +239,247 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         }
     }
 
+    // ========================================================================
+    // 100% NATIVE ANDROID SPEECHRECOGNIZER ENGINE
+    // ========================================================================
+    public void startNativeListening(final String lang) {
+        mainHandler.post(() -> {
+            if (!hasMic()) {
+                requestMicPermission();
+                return;
+            }
+            stopSpeakingNative();
+            listeningLang = (lang == null || lang.trim().isEmpty()) ? "uz-UZ" : lang.trim();
+            isNativeListening = true;
+            accumulatedSpeech.setLength(0);
+            currentPartial = "";
+            mainHandler.removeCallbacks(finalizeSpeechTask);
+            mainHandler.removeCallbacks(restartRecognizerTask);
+
+            ensureSpeechRecognizerCreated();
+            startRecognizerPassInternal();
+            notifyJsEvent("listening:state", "{\"listening\":true}");
+        });
+    }
+
+    public void stopNativeListening() {
+        mainHandler.post(() -> {
+            isNativeListening = false;
+            mainHandler.removeCallbacks(restartRecognizerTask);
+            mainHandler.removeCallbacks(finalizeSpeechTask);
+            String remaining = getCombinedSpeechText();
+            accumulatedSpeech.setLength(0);
+            currentPartial = "";
+            stopRecognizerPassInternal();
+            notifyJsEvent("listening:state", "{\"listening\":false}");
+            if (!remaining.isEmpty()) {
+                dispatchNativeSpeechToJs(remaining, true);
+            }
+        });
+    }
+
+    private void ensureSpeechRecognizerCreated() {
+        if (speechRecognizer != null) return;
+        try {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+            speechRecognizer.setRecognitionListener(new RecognitionListener() {
+                @Override
+                public void onReadyForSpeech(Bundle params) {
+                    recognizerActive = true;
+                }
+
+                @Override
+                public void onBeginningOfSpeech() {
+                    mainHandler.removeCallbacks(finalizeSpeechTask);
+                }
+
+                @Override
+                public void onRmsChanged(float rmsdB) {
+                    long now = System.currentTimeMillis();
+                    if (now - lastRmsDispatchMs < 32L) return;
+                    lastRmsDispatchMs = now;
+                    dispatchVoiceLevelToJs(rmsdB);
+                }
+
+                @Override
+                public void onBufferReceived(byte[] buffer) {}
+
+                @Override
+                public void onEndOfSpeech() {
+                    recognizerActive = false;
+                }
+
+                @Override
+                public void onPartialResults(Bundle partialResults) {
+                    if (!isNativeListening) return;
+                    String part = extractBestMatch(partialResults);
+                    if (!part.isEmpty()) {
+                        currentPartial = part;
+                        String full = getCombinedSpeechText();
+                        dispatchNativeSpeechToJs(full, false);
+                        scheduleSilenceFinalizer(full);
+                    }
+                }
+
+                @Override
+                public void onResults(Bundle results) {
+                    recognizerActive = false;
+                    if (!isNativeListening) return;
+                    String segment = extractBestMatch(results);
+                    currentPartial = "";
+                    if (!segment.isEmpty()) {
+                        if (accumulatedSpeech.length() > 0) accumulatedSpeech.append(' ');
+                        accumulatedSpeech.append(segment);
+                        String full = getCombinedSpeechText();
+                        dispatchNativeSpeechToJs(full, false);
+                        scheduleSilenceFinalizer(full);
+                    }
+                    // Continue listening seamlessly until the 3.5s silence timer finalizes
+                    if (isNativeListening) {
+                        mainHandler.removeCallbacks(restartRecognizerTask);
+                        mainHandler.postDelayed(restartRecognizerTask, 140L);
+                    }
+                }
+
+                @Override
+                public void onError(int error) {
+                    recognizerActive = false;
+                    if (!isNativeListening) return;
+
+                    if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
+                        isNativeListening = false;
+                        requestMicPermission();
+                        return;
+                    }
+
+                    // If we had partial text when timeout/no_match occurred, keep it
+                    if (accumulatedSpeech.length() == 0 && !currentPartial.isEmpty()) {
+                        accumulatedSpeech.append(currentPartial);
+                        currentPartial = "";
+                        String full = getCombinedSpeechText();
+                        dispatchNativeSpeechToJs(full, false);
+                        scheduleSilenceFinalizer(full);
+                    }
+
+                    // If recognizer was busy, recreate cleanly
+                    if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
+                            || error == SpeechRecognizer.ERROR_CLIENT) {
+                        destroySpeechRecognizerInternal();
+                        ensureSpeechRecognizerCreated();
+                    }
+
+                    // Seamless auto-retry on ERROR_NO_MATCH / ERROR_SPEECH_TIMEOUT (never freeze!)
+                    mainHandler.removeCallbacks(restartRecognizerTask);
+                    mainHandler.postDelayed(restartRecognizerTask, 260L);
+                }
+
+                @Override
+                public void onEvent(int eventType, Bundle params) {}
+            });
+        } catch (Throwable ignored) {}
+    }
+
+    private void startRecognizerPassInternal() {
+        if (!isNativeListening || speechRecognizer == null) return;
+        try {
+            if (recognizerActive) {
+                speechRecognizer.cancel();
+                recognizerActive = false;
+            }
+            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, listeningLang);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, listeningLang);
+            intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+            intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
+            intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, PAUSE_FINALIZE_MS);
+            intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, PAUSE_FINALIZE_MS);
+            intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getPackageName());
+            speechRecognizer.startListening(intent);
+            recognizerActive = true;
+        } catch (Throwable t) {
+            recognizerActive = false;
+            mainHandler.postDelayed(restartRecognizerTask, 400L);
+        }
+    }
+
+    private void stopRecognizerPassInternal() {
+        recognizerActive = false;
+        if (speechRecognizer != null) {
+            try {
+                speechRecognizer.cancel();
+            } catch (Throwable ignored) {}
+        }
+    }
+
+    private void destroySpeechRecognizerInternal() {
+        recognizerActive = false;
+        if (speechRecognizer != null) {
+            try {
+                speechRecognizer.cancel();
+                speechRecognizer.destroy();
+            } catch (Throwable ignored) {}
+            speechRecognizer = null;
+        }
+    }
+
+    private void scheduleSilenceFinalizer(String currentFullText) {
+        mainHandler.removeCallbacks(finalizeSpeechTask);
+        if (currentFullText == null || currentFullText.trim().isEmpty()) return;
+        long waitMs = PAUSE_FINALIZE_MS;
+        String lower = currentFullText.trim().toLowerCase(Locale.ROOT);
+        if (lower.endsWith(" va") || lower.endsWith(" keyin") || lower.endsWith(" yani")
+                || lower.endsWith(" lekin") || lower.endsWith(" haligi")) {
+            waitMs = 4200L;
+        }
+        mainHandler.postDelayed(finalizeSpeechTask, waitMs);
+    }
+
+    private String getCombinedSpeechText() {
+        String a = accumulatedSpeech.toString().trim();
+        String p = currentPartial == null ? "" : currentPartial.trim();
+        if (p.isEmpty()) return a;
+        if (a.isEmpty()) return p;
+        return (a + " " + p).trim();
+    }
+
+    private static String extractBestMatch(Bundle bundle) {
+        if (bundle == null) return "";
+        ArrayList<String> matches = bundle.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+        if (matches == null || matches.isEmpty() || matches.get(0) == null) return "";
+        return matches.get(0).trim();
+    }
+
+    private void dispatchNativeSpeechToJs(final String text, final boolean isFinal) {
+        if (webView == null) return;
+        runOnUiThread(() -> {
+            try {
+                String js = "if(typeof window.onNativeSpeech==='function'){"
+                        + "window.onNativeSpeech(" + JSONObject.quote(text == null ? "" : text) + "," + isFinal + ");}";
+                webView.evaluateJavascript(js, null);
+            } catch (Throwable ignored) {}
+        });
+    }
+
+    private void dispatchVoiceLevelToJs(final float rmsdB) {
+        if (webView == null) return;
+        runOnUiThread(() -> {
+            try {
+                String js = "if(typeof window.onVoiceLevel==='function'){window.onVoiceLevel(" + rmsdB + ");}";
+                webView.evaluateJavascript(js, null);
+            } catch (Throwable ignored) {}
+        });
+    }
+
+    // ------------------------------------------------------------------------
+    // Activity lifecycle & navigation
+    // ------------------------------------------------------------------------
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        handleWakeIntent(intent);
-    }
-
-    private void handleWakeIntent(Intent intent) {
-        if (intent == null || !pageReady) return;
-        if (intent.getBooleanExtra("wake_triggered", false)) {
-            String cmd = intent.getStringExtra("wake_command");
-            intent.removeExtra("wake_triggered");
-            try {
-                JSONObject o = new JSONObject();
-                o.put("command", cmd == null ? "" : cmd);
-                notifyJsEvent("onNativeWakeWord", o.toString());
-            } catch (Throwable ignored) {}
+        if (pageReady && hasMic() && !isNativeListening) {
+            startNativeListening("uz-UZ");
         }
     }
 
@@ -216,13 +488,15 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         super.onResume();
         activeInstance = this;
         notifyJsEvent("onAppResumed", "{}");
+        if (pageReady && hasMic() && !isNativeListening) {
+            startNativeListening(listeningLang);
+        }
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        if (speechSession != null) speechSession.cancel();
-        setMicClaimedByWebView(false);
+        stopNativeListening();
         notifyJsEvent("onAppHidden", "{}");
     }
 
@@ -243,19 +517,17 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     @Override
     protected void onDestroy() {
         if (activeInstance == this) activeInstance = null;
-        if (speechSession != null) {
-            speechSession.destroy();
-            speechSession = null;
-        }
+        mainHandler.removeCallbacksAndMessages(null);
+        destroySpeechRecognizerInternal();
         if (tts != null) {
             try { tts.shutdown(); } catch (Throwable ignored) {}
         }
         super.onDestroy();
     }
 
-    /** Hides the overlay and reveals whatever is behind it (launcher / previous app). */
     public void hideOverlay() {
         runOnUiThread(() -> {
+            stopNativeListening();
             try {
                 if (!moveTaskToBack(true)) finish();
             } catch (Throwable t) {
@@ -263,27 +535,6 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             }
             overridePendingTransition(0, 0);
         });
-    }
-
-    // ------------------------------------------------------------------------
-    // JS delivery helpers (used by NovaBridge background threads)
-    // ------------------------------------------------------------------------
-    public void deliverHttp(String reqId, int status, String body) {
-        final String script = "window.NovaNet&&window.NovaNet._resolve("
-                + JSONObject.quote(reqId) + "," + status + "," + JSONObject.quote(body == null ? "" : body) + ");";
-        runOnUiThread(() -> {
-            try {
-                if (webView != null) webView.evaluateJavascript(script, null);
-            } catch (Throwable ignored) {}
-        });
-    }
-
-    // ------------------------------------------------------------------------
-    // Native speech recognition (fallback when no cloud STT key)
-    // ------------------------------------------------------------------------
-    public NovaSpeechSession getSpeechSession() {
-        if (speechSession == null) speechSession = new NovaSpeechSession(this);
-        return speechSession;
     }
 
     // ------------------------------------------------------------------------
@@ -298,6 +549,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         runOnUiThread(() -> {
             if (hasMic()) {
                 notifyJsEvent("onPermissionsUpdated", "{}");
+                startNativeListening("uz-UZ");
                 return;
             }
             SharedPreferences sp = getSharedPreferences("nova_perm", MODE_PRIVATE);
@@ -333,13 +585,6 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 notifyJsEvent("onPermissionsUpdated", "{}");
                 return;
             }
-            SharedPreferences sp = getSharedPreferences("nova_perm", MODE_PRIVATE);
-            boolean asked = sp.getBoolean("phone_asked", false);
-            if (asked && !ActivityCompat.shouldShowRequestPermissionRationale(this, needed.get(0))) {
-                openAppDetails();
-                return;
-            }
-            sp.edit().putBoolean("phone_asked", true).apply();
             ActivityCompat.requestPermissions(this, needed.toArray(new String[0]), REQ_PHONE);
         });
     }
@@ -357,26 +602,10 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (hasMic()) {
-            startHandsFreeIfConfigured();
             notifyJsEvent("mic:granted", "{}");
+            startNativeListening("uz-UZ");
         }
         notifyJsEvent("onPermissionsUpdated", "{}");
-    }
-
-    public void startHandsFreeIfConfigured() {
-        if (!hasMic()) return;
-        boolean enabled = !"false".equals(
-                NovaMemoryVault.getInstance(this).getMemory("hands_free_enabled", "true"));
-        if (enabled && !NovaVoiceForegroundService.isServiceRunning()) {
-            try {
-                Intent svc = new Intent(this, NovaVoiceForegroundService.class);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    startForegroundService(svc);
-                } else {
-                    startService(svc);
-                }
-            } catch (Throwable ignored) {}
-        }
     }
 
     public void requestDismissKeyguardNative() {
@@ -387,18 +616,33 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     }
 
     // ------------------------------------------------------------------------
-    // Text-to-Speech
+    // Text-to-Speech (pauses native SpeechRecognizer while speaking, resumes after)
     // ------------------------------------------------------------------------
     @Override
     public void onInit(int status) {
         if (status == TextToSpeech.SUCCESS && tts != null) {
             ttsReady = true;
             tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
-                @Override public void onStart(String id) { notifyJsEvent("tts:start", "{}"); }
-                @Override public void onDone(String id) { notifyJsEvent("tts:done", "{}"); }
-                @Override @SuppressWarnings("deprecation")
-                public void onError(String id) { notifyJsEvent("tts:done", "{}"); }
-                @Override public void onError(String id, int code) { notifyJsEvent("tts:done", "{}"); }
+                @Override
+                public void onStart(String id) {
+                    notifyJsEvent("tts:start", "{}");
+                }
+
+                @Override
+                public void onDone(String id) {
+                    notifyJsEvent("tts:done", "{}");
+                }
+
+                @Override
+                @SuppressWarnings("deprecation")
+                public void onError(String id) {
+                    notifyJsEvent("tts:done", "{}");
+                }
+
+                @Override
+                public void onError(String id, int code) {
+                    notifyJsEvent("tts:done", "{}");
+                }
             });
         }
     }
@@ -438,12 +682,13 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     }
 
     // ------------------------------------------------------------------------
-    // App launcher (real PackageManager lookup with aliases + fuzzy label match)
+    // Real App Launcher via PackageManager
     // ------------------------------------------------------------------------
     private static final String[][] APP_ALIASES = {
             {"telegram plus", "org.telegram.plus"},
             {"telegram+", "org.telegram.plus"},
-            {"telegram", "org.telegram.messenger", "org.telegram.plus", "org.telegram.messenger.web"},
+            {"plus", "org.telegram.plus"},
+            {"telegram", "org.telegram.plus", "org.telegram.messenger", "org.telegram.messenger.web"},
             {"instagram", "com.instagram.android"},
             {"insta", "com.instagram.android"},
             {"youtube", "com.google.android.youtube"},
@@ -470,7 +715,6 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             {"click", "air.com.ssdsoftwaresolutions.clickuz"},
     };
 
-    /** @return the human label of the launched app, or "" if nothing was found. */
     public String launchAppByNameOrPackage(String query) {
         if (query == null) return "";
         String q = query.toLowerCase(Locale.ROOT)
@@ -482,13 +726,11 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         if (q.isEmpty()) return "";
         PackageManager pm = getPackageManager();
 
-        // 1. Direct package name
         if (q.contains(".") && !q.contains(" ")) {
             Intent d = pm.getLaunchIntentForPackage(q);
             if (d != null && startSafely(d)) return labelOf(q);
         }
 
-        // 2. System intents
         Intent special = null;
         String specialLabel = null;
         if (q.matches(".*(kamera|camera|камера).*")) {
@@ -506,7 +748,6 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         }
         if (special != null && startSafely(special)) return specialLabel;
 
-        // 3. Known aliases (ordered: "telegram plus" before "telegram")
         for (String[] alias : APP_ALIASES) {
             if (q.equals(alias[0]) || q.contains(alias[0])) {
                 for (int i = 1; i < alias.length; i++) {
@@ -516,7 +757,6 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             }
         }
 
-        // 4. Fuzzy label match across every launcher activity on the device
         Intent mainIntent = new Intent(Intent.ACTION_MAIN, null);
         mainIntent.addCategory(Intent.CATEGORY_LAUNCHER);
         List<ResolveInfo> list = pm.queryIntentActivities(mainIntent, 0);

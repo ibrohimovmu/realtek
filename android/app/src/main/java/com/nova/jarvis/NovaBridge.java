@@ -32,7 +32,7 @@ public class NovaBridge {
     }
 
     // ========================================================================
-    // 0. OVERLAY DISMISS & NATIVE SPEECH RECOGNIZER (3.5s Pause Patience)
+    // 0. OVERLAY DISMISS & 100% NATIVE SPEECH RECOGNIZER (MainActivity)
     // ========================================================================
     @JavascriptInterface
     public void hideOverlay() {
@@ -40,25 +40,28 @@ public class NovaBridge {
     }
 
     @JavascriptInterface
+    public void startNativeListening(String lang) {
+        activity.startNativeListening(lang);
+    }
+
+    @JavascriptInterface
+    public void stopNativeListening() {
+        activity.stopNativeListening();
+    }
+
+    @JavascriptInterface
     public void startNativeStt(String lang, int pauseMs) {
-        if (!activity.hasMic()) {
-            activity.requestMicPermission();
-            return;
-        }
-        MainActivity.setMicClaimedByWebView(true);
-        activity.getSpeechSession().start(lang, pauseMs);
+        activity.startNativeListening(lang);
     }
 
     @JavascriptInterface
     public void stopNativeStt() {
-        activity.getSpeechSession().stop();
-        MainActivity.setMicClaimedByWebView(false);
+        activity.stopNativeListening();
     }
 
     @JavascriptInterface
     public void cancelNativeStt() {
-        activity.getSpeechSession().cancel();
-        MainActivity.setMicClaimedByWebView(false);
+        activity.stopNativeListening();
     }
 
     // ========================================================================

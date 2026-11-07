@@ -3,178 +3,69 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>NOVA Overlay</title>
+  <title>NOVA</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body data-hud-mode="bixby" data-listening="false">
+<body data-speaking-active="false">
 
-  <!-- =====================================================================
-       1. TOP 75% TRANSPARENT DISMISS AREA
-       Shows the real Android launcher / apps behind the overlay.
-       Tapping anywhere here closes the overlay (NovaNative.hideOverlay()).
-       ===================================================================== -->
+  <!-- 1. Top Transparent Area (Reveals Launcher & Apps Behind; Tap to Dismiss) -->
   <div id="transparent-dismiss-zone" aria-label="Dismiss Overlay"></div>
 
-  <!-- =====================================================================
-       2. GEMINI LIVE 4-SIDE EDGE GLOW + CORNER BRACKETS + PARTICLE MIST
-       (Active in Rejim B: Gemini Edge Glow Mode — Screenshots 2 & 3)
-       ===================================================================== -->
-  <div id="gemini-edge-frame">
-    <div class="edge-glow-border"></div>
-    <div class="gemini-corner tl"></div>
-    <div class="gemini-corner tr"></div>
-    <canvas id="gemini-mist-canvas"></canvas>
+  <!-- 2. 4-Sided Gemini Live Cyan-Blue Neon Edge Glow + Bottom Particle Mist -->
+  <div id="edge-glow-container">
+    <div class="neon-edge-border"></div>
+    <canvas id="bottom-mist-canvas"></canvas>
   </div>
 
-  <!-- =====================================================================
-       3. COMPACT BOTTOM OVERLAY HUD (Rejim A: Bixby Mini Card | Rejim B: Gemini Live)
-       ===================================================================== -->
-  <div id="compact-hud-root">
+  <!-- 3. Bottom Compact Stage: Boxless Live Words + AI Glass Capsule + Spring 3D Plasma Sphere -->
+  <div id="bottom-orb-stage">
 
-    <!-- ===================================================================
-         REJIM A: BIXBY MINI CARD + 68x68 3D LIQUID SPHERE (Screenshot 1)
-         =================================================================== -->
-    <section id="bixby-hud">
-      <div id="bixby-mini-card">
-        <!-- Top-right Settings Gear (⚙️) -->
-        <button id="bixby-settings-btn" class="bixby-card-gear" aria-label="Settings">
-          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-        </button>
+    <!-- Boxless Neon-White Live Speech Words (Blur-Fade Animation as User Speaks) -->
+    <div id="live-speech-stream"></div>
 
-        <!-- Main Transcript / Assistant Response Text -->
-        <div id="bixby-card-text">Eshitmoqdaman...</div>
-        <div id="bixby-card-sub" class="bixby-card-sub">3.5s pauza kutish faol • "Telegram Plus'ni och", "Budilnik qo'y"</div>
+    <!-- Minimalist Dark Glassmorphism Capsule (Expands ONLY when AI Replies) -->
+    <div id="ai-response-capsule">
+      <div id="ai-response-text"></div>
+    </div>
 
-        <!-- Inline Keyboard Input Row (toggled by keyboard icon) -->
-        <div id="bixby-inline-input-row">
-          <input id="bixby-inline-input" type="text" placeholder="Buyruq yoki savol yozing..." autocomplete="off" />
-          <button id="bixby-inline-send">Yuborish</button>
-        </div>
-
-        <!-- Bottom-right Keyboard Icon (⌨️) -->
-        <button id="bixby-kb-btn" class="bixby-card-kb" aria-label="Keyboard">
-          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
-            <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M7 16h10"></path>
-          </svg>
-        </button>
-      </div>
-
-      <!-- 68px x 68px Floating 3D Liquid Blue-Cyan Sphere (Bixby Orb) -->
-      <button id="bixby-orb-button" aria-label="Nova Voice Orb">
-        <canvas id="bixby-orb-canvas" width="136" height="136"></canvas>
+    <!-- Spring Slide-Up 3D Liquid Plasma Sphere (Tap: Listen | Long-Press: Settings) -->
+    <div id="orb-spring-wrapper">
+      <button id="plasma-orb-btn" aria-label="Nova Plasma Orb">
+        <canvas id="plasma-orb-canvas" width="168" height="168"></canvas>
       </button>
-    </section>
+    </div>
 
-    <!-- ===================================================================
-         REJIM B: GEMINI LIVE EDGE GLOW + ROUNDED CAPSULE (Screenshots 2 & 3)
-         =================================================================== -->
-    <section id="gemini-hud">
-      <!-- Floating AI Response Bubble above capsule -->
-      <div id="gemini-response-bubble"></div>
-
-      <!-- Floating Action Pill ("Share screen with Live" + Mode Switch) -->
-      <div class="gemini-floating-pills">
-        <button id="btn-share-live-pill" class="gemini-pill-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-            <path d="M12 13V7M9 10l3-3 3 3M8 21h8"></path>
-          </svg>
-          <span>Share screen with Live</span>
-        </button>
-        <button id="btn-switch-to-bixby-pill" class="gemini-pill-btn" title="Bixby Mini Card rejimiga o'tish">
-          <span>🔵 Bixby Mode</span>
-        </button>
-      </div>
-
-      <!-- Bottom Capsule (border-radius: 32px, background: rgba(15, 18, 24, 0.94)) -->
-      <div id="gemini-capsule">
-        <!-- Left '+' Button -->
-        <button id="gemini-plus-btn" class="gemini-icon-btn" aria-label="Settings & Tools">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-        </button>
-
-        <!-- Center Input / Live Voice Transcript -->
-        <input id="gemini-input" type="text" placeholder="Ask Gemini" autocomplete="off" />
-
-        <!-- Settings Gear (⚙️) -->
-        <button id="gemini-settings-btn" class="gemini-icon-btn" aria-label="Settings">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-        </button>
-
-        <!-- Glowing Blue Mic Button (🎤) -->
-        <button id="gemini-mic-btn" aria-label="Voice Input">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-            <line x1="12" y1="19" x2="12" y2="23"></line>
-            <line x1="8" y1="23" x2="16" y2="23"></line>
-          </svg>
-        </button>
-
-        <!-- Rightmost Live Waveform / Send Button -->
-        <button id="gemini-live-wave-btn" aria-label="Send or Live">
-          <span class="wave-bar" id="wb-1" style="height:8px;"></span>
-          <span class="wave-bar" id="wb-2" style="height:16px;"></span>
-          <span class="wave-bar" id="wb-3" style="height:10px;"></span>
-        </button>
-      </div>
-    </section>
   </div>
 
-  <!-- =====================================================================
-       4. SETTINGS (⚙️) & PERMISSIONS BOTTOM-SHEET
-       ===================================================================== -->
+  <!-- 4. Settings & Permissions Bottom-Sheet (Opened by holding Orb for 0.9s) -->
   <div id="settings-sheet-backdrop">
     <div id="settings-bottom-sheet">
       <div class="sheet-handle"></div>
       <div class="sheet-header">
-        <div class="sheet-title">⚙️ NOVA Overlay Sozlamalari</div>
+        <div class="sheet-title">⚙️ NOVA Sozlamalar & Ruxsatlar</div>
         <button id="sheet-close-btn" class="sheet-close">✕</button>
-      </div>
-
-      <!-- HUD Mode Switcher: Bixby Mode vs Gemini Edge Mode -->
-      <div class="sheet-section">
-        <div class="sheet-section-title">1. Overlay Dizayn Rejimi</div>
-        <div class="mode-switch-grid">
-          <button id="mode-btn-bixby" class="mode-option-btn active">
-            🔵 Bixby Mini Card
-          </button>
-          <button id="mode-btn-gemini" class="mode-option-btn">
-            ✨ Gemini Live Edge
-          </button>
-        </div>
       </div>
 
       <!-- Gemini API Key & Groq API Key -->
       <div class="sheet-section">
-        <div class="sheet-section-title">2. AI API Kalitlari (Haqiqiy Fetch)</div>
+        <div class="sheet-section-title">1. AI API Kalitlari (Haqiqiy Fetch)</div>
         <label class="field-label" for="input-gemini-key">Gemini API Key (generativelanguage.googleapis.com)</label>
-        <input id="input-gemini-key" class="sheet-input" type="password" placeholder="AIzaSy... (ixtiyoriy, zahira kalit mavjud)" autocomplete="off" />
+        <input id="input-gemini-key" class="sheet-input" type="password" placeholder="AIzaSy... (ixtiyoriy)" autocomplete="off" />
 
         <label class="field-label" for="input-groq-key">Groq API Key (api.groq.com — Llama 3.3 70B)</label>
-        <input id="input-groq-key" class="sheet-input" type="password" placeholder="gsk_... (ixtiyoriy, zahira kalit mavjud)" autocomplete="off" />
+        <input id="input-groq-key" class="sheet-input" type="password" placeholder="gsk_... (ixtiyoriy)" autocomplete="off" />
 
         <button id="btn-save-api-keys" class="sheet-save-btn">API Kalitlarni Saqlash</button>
       </div>
 
       <!-- Real Android Permissions via NovaBridge -->
       <div class="sheet-section">
-        <div class="sheet-section-title">3. Tizim Ruxsatlari (Real Android Settings)</div>
+        <div class="sheet-section-title">2. Tizim Ruxsatlari (Real Android Settings)</div>
 
         <div class="perm-row">
           <div class="perm-info">
-            <div class="perm-name">🎤 Microphone (Ovoz eshitish)</div>
-            <div class="perm-desc">3.5s pauza bilan ovozni yozib olish va "Hey Nova"</div>
+            <div class="perm-name">🎤 Microphone (Native SpeechRecognizer)</div>
+            <div class="perm-desc">100% Native Android ovoz tanish va jonli to'lqin</div>
           </div>
           <button class="perm-action-btn" data-perm="microphone" id="perm-btn-microphone">Yoqish</button>
         </div>
@@ -182,7 +73,7 @@
         <div class="perm-row">
           <div class="perm-info">
             <div class="perm-name">🤖 Accessibility Service</div>
-            <div class="perm-desc">Telegram Plus ichida xabar yozish, qulf ochish va avto-boshqaruv</div>
+            <div class="perm-desc">Telegram Plus avto-yozish va qulfni ochish</div>
           </div>
           <button class="perm-action-btn" data-perm="accessibility" id="perm-btn-accessibility">Sozlash</button>
         </div>
@@ -190,7 +81,7 @@
         <div class="perm-row">
           <div class="perm-info">
             <div class="perm-name">🪟 Overlay (Ilovalar ustida ko'rinish)</div>
-            <div class="perm-desc">Boshqa ilovalar va qulf ekrani ustida shaffof chiqish</div>
+            <div class="perm-desc">Boshqa ilovalar ustida shaffof chiqish</div>
           </div>
           <button class="perm-action-btn" data-perm="overlay" id="perm-btn-overlay">Sozlash</button>
         </div>
@@ -198,7 +89,7 @@
         <div class="perm-row">
           <div class="perm-info">
             <div class="perm-name">📞 Phone Calls (Qo'ng'iroqlar & 6-Gudok)</div>
-            <div class="perm-desc">Qo'ng'iroqlarni boshqarish va 6-gudok kotib tizimi</div>
+            <div class="perm-desc">6-gudok kotib tizimi uchun</div>
           </div>
           <button class="perm-action-btn" data-perm="phoneCalls" id="perm-btn-phoneCalls">Yoqish</button>
         </div>

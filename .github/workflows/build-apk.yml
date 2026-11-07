@@ -45,34 +45,34 @@ jobs:
 
       - name: Package APK Files
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk Nova-Overlay-v3.0.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk Nova-Overlay-v3.1.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk Nova-Jarvis.apk
 
-      - name: Upload Nova-Overlay-v3.0.apk Artifact
+      - name: Upload Nova-Overlay-v3.1.apk Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Nova-Overlay-v3.0-APK
+          name: Nova-Overlay-v3.1-APK
           path: |
-            Nova-Overlay-v3.0.apk
+            Nova-Overlay-v3.1.apk
             Nova-Jarvis.apk
           retention-days: 30
 
-      - name: Publish v3.0.0 to GitHub Releases
+      - name: Publish v3.1.0 to GitHub Releases
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: nova-overlay-v3.0.0
-          name: "NOVA v3.0.0 — 100% Shaffof (Translucent) Bixby Mini Card & Gemini Live Edge Overlay"
+          tag_name: nova-overlay-v3.1.0
+          name: "NOVA v3.1.0 — 100% Native SpeechRecognizer + Edge Glow + Spring 3D Plasma Sphere"
           make_latest: true
           body: |
-            ## 🌌 NOVA v3.0.0 (`Nova-Overlay-v3.0.apk` / `Nova-Jarvis.apk`) — 100% Translucent Compact Overlay
+            ## 🌌 NOVA v3.1.0 (`Nova-Overlay-v3.1.apk` / `Nova-Jarvis.apk`)
 
-            - **100% Shaffof Oyna (`Theme.Translucent.NoTitleBar` + `Color.TRANSPARENT`):** Ekranning yuqori 75% qismi to'liq shaffof — orqadagi telefon ekrani (launcher va ilovalar) ko'rinib turadi, tepaga bosganda overlay yopiladi.
-            - **Rejim A (Bixby Mini Card):** Pastki markazda `68x68px` 3D suyuq ko'k-firuza sfera + ixcham xira-shaffof kartochka (`⚙️` sozlamalar va `⌨️` klaviatura tugmalari bilan).
-            - **Rejim B (Gemini Live Edge Glow):** Ekranning 4 ta cheti bo'ylab ko'k-firuza neon nur (Edge Glow), pastki ko'k zarralar (particle mist), `"Share screen with Live"` va pastki yumaloq kapsula.
-            - **Haqiqiy Ovoz (3.5s Pauza Kutish) & Qurilma Boshqaruvi:** Gemini API + Groq API haqiqiy `fetch`, `PackageManager` orqali ilovalarni ochish (*"Telegram Plus'ni och"*, *"Instagramni och"*), `AlarmClock` budilnik va `NovaAccessibilityService`.
+            - **100% Native Android `SpeechRecognizer` (`MainActivity.java`):** Orqa fondagi mikrofon band qilish olib tashlandi; real-vaqtda `window.onNativeSpeech(text, isFinal)` va `window.onVoiceLevel(rmsdB)` ishlaydi.
+            - **Zero Grey Box:** Zerikarli kulrang xato qutisi va ikkinchi klaviatura tugmasi butunlay olib tashlandi.
+            - **Spring Slide-Up + 4-Sided Edge Glow + 3D Liquid Plasma Sphere:** Ilova ochilganda 4 ta chet bo'ylab ko'k-firuza neon nur (Edge Glow) va pastdan `cubic-bezier(0.22, 1, 0.36, 1)` spring animatsiyasi bilan 3D Suyuq Plazma Sferasi suzib chiqadi.
+            - **Blur-Fade Jonli Yozuv & Glassmorphic AI Kapsula:** Gapirayotganda so'zlar sfera tepasida qutisiz, shaffof fonda neon-oq harflar bilan yoziladi; faqat AI javob berganda shaffof-shisha (dark glassmorphism) kapsula silliq kengayib ochiladi.
           files: |
-            Nova-Overlay-v3.0.apk
+            Nova-Overlay-v3.1.apk
             Nova-Jarvis.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
