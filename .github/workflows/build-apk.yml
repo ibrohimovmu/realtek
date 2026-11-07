@@ -1,4 +1,4 @@
-name: Build AURA Music APK
+name: Build WABI Family & Discipline APK
 
 on:
   push:
@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: 20
 
-      - name: Sync AURA Web Assets to Android Bundle
+      - name: Sync WABI Web Assets to Android Bundle
         run: |
           npm run sync
 
@@ -39,7 +39,7 @@ jobs:
           gradle-version: 8.7
           cache-disabled: true
 
-      - name: Build AURA Music APK (API 26 - API 35)
+      - name: Build WABI APK (API 26 - API 35)
         working-directory: android
         run: |
           chmod +x gradlew
@@ -54,40 +54,38 @@ jobs:
             exit 1
           fi
           echo "Packaging APK from $APK_PATH"
-          cp "$APK_PATH" Aura-Music.apk
-          cp "$APK_PATH" Aura-v1.0.apk
+          cp "$APK_PATH" Wabi-Family.apk
+          cp "$APK_PATH" Wabi-v1.0.apk
 
-      - name: Upload Aura-Music.apk Artifact
+      - name: Upload Wabi-Family.apk Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Aura-Music-APK
+          name: Wabi-Family-APK
           path: |
-            Aura-Music.apk
-            Aura-v1.0.apk
+            Wabi-Family.apk
+            Wabi-v1.0.apk
           retention-days: 30
 
       - name: Publish v1.0.0 to GitHub Releases
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: aura-v1.0.0
-          name: "AURA v1.0.0 — Next-Gen Ambient & 3D Vinyl Music Player"
+          tag_name: wabi-v1.0.0
+          name: "WABI v1.0.0 — Smart Family Discipline & Focus Ecosystem"
           make_latest: true
           body: |
-            ## 🎵 AURA v1.0.0 (`Aura-Music.apk` / `Aura-v1.0.apk`)
+            ## 🌟 WABI v1.0.0 (`Wabi-Family.apk` / `Wabi-v1.0.apk`)
 
-            The next-generation Ambient & 3D Vinyl Music Player for Android (API 26 to API 35):
+            Ota-ona va farzandlar uchun "Oila & Intizom" (Smart Discipline & Focus Ecosystem) — 0% Mock / 100% Realtime:
 
-            ### 🌟 Key Highlights:
-            - 💿 **Interactive 3D Vinyl Turntable:** Photorealistic rotating vinyl with moving mechanical tonearm (needle arm) that automatically drops onto the vinyl on play and lifts off on pause. Plus interactive DJ scratch touch scrub!
-            - 🎨 **Dynamic Ambient Mesh Glow:** Background colors morph smoothly matching the album artwork.
-            - 📊 **60/120 FPS Live Spectrum Visualizer:** Additive-blended neon waveform reacting in real-time to audio amplitude and bass frequencies.
-            - 🔒 **Dual Lockscreen Experience:** Native Android 11-15 lock screen notification with media controls + optional AURA Ambient Lockscreen mode (`SHOW_WHEN_LOCKED`).
-            - 🎛️ **5-Band Hardware Equalizer & 3D Bass Boost:** Custom presets for deep bass, rock, synthwave, and vocals.
-            - 📁 **Automated Local Storage Scanner:** Scans and indexes all MP3, FLAC, M4A, WAV audio files on device with instant search.
-            - 🌙 **Sleep Timer with Smooth Fade-Out:** 15, 30, 45, 60 minutes with smooth volume decline.
+            ### ✨ Asosiy Imkoniyatlar:
+            - 🔮 **"Meet Wabi" Liquid Glass Lens Swipe:** WebGL qavariq shisha linzasi, ranglar sinishi (Chromatic Aberration) va 2D fizika pufakchalari otilib chiqishi.
+            - 🧸 **"What's Your Vibe Today?" 3D Paxmoq Personaj:** 60 FPS procedural fur shell rendering, kayfiyatga qarab yashil/olovrang/qizil rangga va ko'z morfingiga ega.
+            - 👑 **Dual Role Tizimi:** Ota-ona (Parent) va Farzand (Kid) rejimlari 6 xonali oila kodi orqali real vaqtda bog'lanadi.
+            - 🛡️ **Haqiqiy Android Nazorati:** `UsageStatsManager` va `AccessibilityService` orqali Instagram/o'yinlar limiti tugashi bilan "Warm Espresso Focus Lock" ekrani bilan bloklash.
+            - 🕌 **Namangan Namoz Vaqtlari:** Aladhan API va `AlarmManager` orqali avtomatik 5 mahal namoz eslatmalari.
           files: |
-            Aura-Music.apk
-            Aura-v1.0.apk
+            Wabi-Family.apk
+            Wabi-v1.0.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

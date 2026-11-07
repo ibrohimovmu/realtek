@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">AURA</string>
-    <string name="app_desc">AURA Next-Gen Ambient &amp; Vinyl Music Player</string>
+    <string name="app_name">Wabi</string>
+    <string name="app_desc">WABI Oila &amp; Intizom — Parent and Kids Smart Discipline</string>
+    <string name="accessibility_service_desc">WABI Oila &amp; Intizom xizmati orqali ilovalar vaqtini nazorat qilish va belgilangan limitdan oshganda bloklash</string>
 </resources>

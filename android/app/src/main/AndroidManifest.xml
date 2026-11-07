@@ -2,30 +2,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Audio Playback & Media Storage Permissions -->
+    <!-- Core Networking & System Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-
-    <!-- Storage permissions for scanning local MP3/audio files -->
-    <uses-permission
-        android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
-    <uses-permission
-        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="29"
-        tools:ignore="ScopedStorage" />
-    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
-
-    <!-- Background playback & media service permissions (Android 8 to 15) -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Lockscreen Ambient HUD & Wake Permissions -->
-    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+    <!-- Exact Alarm for Prayer Reminders -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+    <!-- App Usage Tracking & Interception -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:allowBackup="true"
@@ -37,36 +29,45 @@
         android:hardwareAccelerated="true"
         android:theme="@style/AppTheme">
 
-        <!-- Main Activity: 120 FPS Ambient Vinyl Player & Lock Screen HUD -->
+        <!-- Main Edge-to-Edge Container -->
         <activity
-            android:name="com.aura.music.MainActivity"
+            android:name="com.wabi.family.MainActivity"
             android:theme="@style/AppTheme"
             android:exported="true"
             android:launchMode="singleTop"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|uiMode"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Open audio files directly from file managers, Telegram, WhatsApp -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:scheme="file" />
-                <data android:scheme="content" />
-                <data android:mimeType="audio/*" />
-            </intent-filter>
         </activity>
 
-        <!-- Background Media Service with MediaSession & Lockscreen Notification -->
-        <service
-            android:name="com.aura.music.AuraMusicService"
-            android:enabled="true"
+        <!-- Focus Lock Interception Screen -->
+        <activity
+            android:name="com.wabi.family.FocusLockActivity"
+            android:theme="@style/AppTheme"
             android:exported="false"
-            android:foregroundServiceType="mediaPlayback" />
+            android:launchMode="singleInstance"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize" />
+
+        <!-- Hard App Lock Accessibility Service -->
+        <service
+            android:name="com.wabi.family.FocusLockAccessibilityService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- Islamic Prayer Call Alarm Receiver -->
+        <receiver
+            android:name="com.wabi.family.PrayerAlarmReceiver"
+            android:exported="false" />
 
     </application>
 

@@ -1,719 +1,468 @@
 /**
- * AURA Next-Gen Music Player
- * 120 FPS Vinyl Turntable, Dynamic Ambient Mesh Glow & Audio Engine Bridge
+ * WABI MAIN APPLICATION CONTROLLER
+ * - Dual Role: Parent Mode vs Kid Mode.
+ * - Zero Mock / 100% Real Backend & Native Integration.
  */
 
-(function () {
-  'use strict';
+let supabaseClient;
+let wabiLens;
+let furryVibe;
+let selectedRole = 'parent';
+let currentFamily = null;
+let currentProfile = null;
 
-  // Global event bus for native callbacks
-  window.AuraEvents = {
-    _handlers: {},
-    on(event, fn) {
-      if (!this._handlers[event]) this._handlers[event] = [];
-      this._handlers[event].push(fn);
-    },
-    emit(event, payload) {
-      const list = this._handlers[event];
-      if (list) {
-        for (let i = 0; i < list.length; i++) {
-          try {
-            list[i](payload);
-          } catch (e) {}
+document.addEventListener('DOMContentLoaded', async () => {
+    supabaseClient = new WabiSupabaseClient();
+
+    // 1. Initialize Wabi Lens Swipe (2-video)
+    wabiLens = new WabiLens('lens-canvas', {
+        onUnlock: () => {
+            handleLensUnlocked();
         }
-      }
-    },
-  };
+    });
 
-  class AuraPlayer {
-    constructor() {
-      this.playlist = [];
-      this.currentIndex = 0;
-      this.isPlaying = false;
-      this.currentTimeMs = 0;
-      this.durationMs = 0;
-      this.isShuffle = false;
-      this.repeatMode = 1; // 0 = off, 1 = all, 2 = one
-      this.favorites = new Set(
-        JSON.parse(localStorage.getItem('aura_favorites') || '[]')
-      );
+    // 2. Initialize 3D Furry Character (1-video)
+    furryVibe = new FurryVibe('furry-canvas', 'vibe-slider', {
+        onVibeChange: (score) => {
+            // Live vibe preview
+        }
+    });
 
-      this.currentPalette = {
-        primary: '#00f0ff',
-        secondary: '#9d4edd',
-        tertiary: '#ff2a85',
-      };
+    // 3. Check existing profile & family
+    currentFamily = supabaseClient.getCachedFamily();
+    currentProfile = supabaseClient.getCachedProfile();
 
-      this.phase = 0;
-      this.beatEnergy = 0.2;
-
-      this._init();
+    if (currentProfile && currentFamily) {
+        document.getElementById('welcome-screen').classList.add('hidden');
+        renderDashboard();
     }
 
-    _init() {
-      this._bindUi();
-      this._bindNativeBridge();
-      this._startAmbientCanvasLoop();
-      this._startSpectrumVisualizerLoop();
-      this._setupVinylScratchInteractions();
+    // 4. Load Namangan prayer times
+    loadPrayerTimes();
 
-      // Initial request for tracks
-      const bridge = window.AuraBridge || window.AuraNative;
-      if (bridge && typeof bridge.getPlaylistJson === 'function') {
-        try {
-          const raw = bridge.getPlaylistJson();
-          if (raw && raw !== '[]') {
-            this.setPlaylist(JSON.parse(raw));
-          }
-        } catch (e) {}
-      }
-    }
+    // 5. Check Native Permissions
+    updatePermissionPills();
+});
 
-    // ========================================================================
-    // 1. UI & CONTROL BINDINGS
-    // ========================================================================
-    _bindUi() {
-      // Stage view mode tabs (Vinyl | Visualizer | Lyrics)
-      const tabs = document.querySelectorAll('.mode-tab');
-      tabs.forEach((tab) => {
-        tab.addEventListener('click', () => {
-          tabs.forEach((t) => t.classList.remove('active'));
-          tab.classList.add('active');
-          const target = tab.dataset.target;
-          document.body.setAttribute('data-mode', target);
-          document.querySelectorAll('.stage-section').forEach((sec) => {
-            sec.classList.remove('active');
-          });
-          const activeSec = document.getElementById(`stage-${target}`);
-          if (activeSec) activeSec.classList.add('active');
-        });
-      });
-
-      // Transport Buttons
-      const playBtn = document.getElementById('btn-play-pause');
-      if (playBtn) {
-        playBtn.addEventListener('click', () => this.togglePlayPause());
-      }
-
-      const nextBtn = document.getElementById('btn-next');
-      if (nextBtn) {
-        nextBtn.addEventListener('click', () => this.nextTrack());
-      }
-
-      const prevBtn = document.getElementById('btn-prev');
-      if (prevBtn) {
-        prevBtn.addEventListener('click', () => this.prevTrack());
-      }
-
-      const shuffleBtn = document.getElementById('btn-shuffle');
-      if (shuffleBtn) {
-        shuffleBtn.addEventListener('click', () => this.toggleShuffle());
-      }
-
-      const repeatBtn = document.getElementById('btn-repeat');
-      if (repeatBtn) {
-        repeatBtn.addEventListener('click', () => this.toggleRepeat());
-      }
-
-      const favBtn = document.getElementById('btn-favorite');
-      if (favBtn) {
-        favBtn.addEventListener('click', () => this.toggleFavorite());
-      }
-
-      // Seek Bar
-      const seekContainer = document.getElementById('seek-container');
-      if (seekContainer) {
-        const handleSeek = (e) => {
-          const rect = seekContainer.getBoundingClientRect();
-          const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-          const pos = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-          const targetMs = Math.round(pos * this.durationMs);
-          this.seekTo(targetMs);
-        };
-
-        seekContainer.addEventListener('mousedown', handleSeek);
-        seekContainer.addEventListener('touchstart', handleSeek, { passive: true });
-      }
-
-      // Drawers: Library
-      const btnOpenLibrary = document.getElementById('btn-open-library');
-      const libraryDrawer = document.getElementById('library-drawer-backdrop');
-      if (btnOpenLibrary && libraryDrawer) {
-        btnOpenLibrary.addEventListener('click', () => {
-          libraryDrawer.classList.add('open');
-        });
-        libraryDrawer.addEventListener('click', (e) => {
-          if (e.target === libraryDrawer) libraryDrawer.classList.remove('open');
-        });
-      }
-
-      const btnScan = document.getElementById('btn-scan-device');
-      if (btnScan) {
-        btnScan.addEventListener('click', () => {
-          const bridge = window.AuraBridge || window.AuraNative;
-          if (bridge && typeof bridge.scanLocalAudio === 'function') {
-            bridge.scanLocalAudio();
-          }
-        });
-      }
-
-      const searchInput = document.getElementById('input-search-tracks');
-      if (searchInput) {
-        searchInput.addEventListener('input', (e) => {
-          this.renderTrackList(e.target.value.toLowerCase().trim());
-        });
-      }
-
-      // Drawers: Equalizer
-      const btnOpenEq = document.getElementById('btn-open-eq');
-      const eqBackdrop = document.getElementById('eq-modal-backdrop');
-      const btnCloseEq = document.getElementById('btn-close-eq');
-      if (btnOpenEq && eqBackdrop) {
-        btnOpenEq.addEventListener('click', () => eqBackdrop.classList.add('open'));
-        if (btnCloseEq) {
-          btnCloseEq.addEventListener('click', () => eqBackdrop.classList.remove('open'));
-        }
-        eqBackdrop.addEventListener('click', (e) => {
-          if (e.target === eqBackdrop) eqBackdrop.classList.remove('open');
-        });
-      }
-
-      // Equalizer Sliders
-      document.querySelectorAll('.vertical-slider').forEach((slider) => {
-        slider.addEventListener('input', (e) => {
-          const band = parseInt(e.target.dataset.band, 10);
-          const val = parseInt(e.target.value, 10);
-          const bridge = window.AuraBridge || window.AuraNative;
-          if (bridge && typeof bridge.setEqualizerBand === 'function') {
-            bridge.setEqualizerBand(band, val);
-          }
-        });
-      });
-
-      // Bass Boost Slider
-      const bassSlider = document.getElementById('slider-bass-boost');
-      const bassValText = document.getElementById('bass-strength-value');
-      if (bassSlider) {
-        bassSlider.addEventListener('input', (e) => {
-          const val = parseInt(e.target.value, 10);
-          if (bassValText) {
-            bassValText.textContent = `${Math.round(val / 10)}% quvvat`;
-          }
-          const bridge = window.AuraBridge || window.AuraNative;
-          if (bridge && typeof bridge.setBassBoost === 'function') {
-            bridge.setBassBoost(val);
-          }
-        });
-      }
-
-      // Drawers: Sleep Timer
-      const btnOpenTimer = document.getElementById('btn-open-timer');
-      const timerBackdrop = document.getElementById('timer-modal-backdrop');
-      const btnCloseTimer = document.getElementById('btn-close-timer');
-      if (btnOpenTimer && timerBackdrop) {
-        btnOpenTimer.addEventListener('click', () => timerBackdrop.classList.add('open'));
-        if (btnCloseTimer) {
-          btnCloseTimer.addEventListener('click', () => timerBackdrop.classList.remove('open'));
-        }
-        timerBackdrop.addEventListener('click', (e) => {
-          if (e.target === timerBackdrop) timerBackdrop.classList.remove('open');
-        });
-      }
-
-      document.querySelectorAll('.timer-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const mins = parseInt(btn.dataset.minutes, 10);
-          const bridge = window.AuraBridge || window.AuraNative;
-          if (bridge && typeof bridge.setSleepTimer === 'function') {
-            bridge.setSleepTimer(mins);
-          }
-          if (timerBackdrop) timerBackdrop.classList.remove('open');
-        });
-      });
-
-      // Lock Screen Ambient Mode Toggle
-      const ambientBtn = document.getElementById('btn-toggle-ambient-mode');
-      if (ambientBtn) {
-        let isAmbientActive = true;
-        ambientBtn.addEventListener('click', () => {
-          isAmbientActive = !isAmbientActive;
-          ambientBtn.classList.toggle('active', isAmbientActive);
-          const bridge = window.AuraBridge || window.AuraNative;
-          if (bridge && typeof bridge.setLockscreenAmbient === 'function') {
-            bridge.setLockscreenAmbient(isAmbientActive);
-          }
-        });
-      }
-    }
-
-    // ========================================================================
-    // 2. NATIVE BRIDGE EVENTS
-    // ========================================================================
-    _bindNativeBridge() {
-      window.AuraEvents.on('onTracksLoaded', (data) => {
-        if (Array.isArray(data)) {
-          this.setPlaylist(data);
-        }
-      });
-
-      window.AuraEvents.on('onTrackChanged', (track) => {
-        this.updateCurrentTrackUi(track);
-      });
-
-      window.AuraEvents.on('onPlaybackState', (info) => {
-        this.isPlaying = info.state === 'playing';
-        this.currentTimeMs = info.position || 0;
-        this.durationMs = info.duration || this.durationMs;
-        this.updatePlayPauseUi();
-        this.updateProgressUi();
-      });
-
-      window.AuraEvents.on('onPlaybackProgress', (prog) => {
-        this.currentTimeMs = prog.position || 0;
-        this.durationMs = prog.duration || this.durationMs;
-        this.updateProgressUi();
-      });
-
-      window.AuraEvents.on('onSleepTimerTick', (info) => {
-        const badge = document.getElementById('timer-active-badge');
-        const text = document.getElementById('timer-countdown-text');
-        if (!badge || !text) return;
-        if (info.remainingSeconds > 0) {
-          badge.classList.remove('hidden');
-          const m = Math.floor(info.remainingSeconds / 60);
-          const s = info.remainingSeconds % 60;
-          text.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+// ============================================================================
+// WELCOME SCREEN & SETUP FLOW
+// ============================================================================
+function handleLensUnlocked() {
+    setTimeout(() => {
+        if (!currentProfile || !currentFamily) {
+            document.getElementById('setup-modal').classList.add('active');
         } else {
-          badge.classList.add('hidden');
+            document.getElementById('welcome-screen').classList.add('hidden');
+            renderDashboard();
         }
-      });
-    }
+    }, 450);
+}
 
-    // ========================================================================
-    // 3. PLAYLIST & TRACK RENDERING
-    // ========================================================================
-    setPlaylist(tracks) {
-      if (!tracks || !tracks.length) return;
-      this.playlist = tracks;
+function selectRole(role) {
+    selectedRole = role;
+    document.getElementById('role-parent').classList.toggle('selected', role === 'parent');
+    document.getElementById('role-kid').classList.toggle('selected', role === 'kid');
+    if (window.WabiBridge) window.WabiBridge.triggerHaptic(1);
+}
 
-      const countPill = document.getElementById('library-count-pill');
-      if (countPill) {
-        countPill.textContent = `${tracks.length} trek`;
-      }
+async function confirmSetup() {
+    const nameInput = document.getElementById('input-user-name');
+    const codeInput = document.getElementById('input-family-code');
 
-      this.renderTrackList('');
+    const name = nameInput.value.trim() || (selectedRole === 'parent' ? 'Ota-ona' : 'Farzand');
+    const code = codeInput.value.trim();
 
-      if (!this.isPlaying && tracks[0]) {
-        this.updateCurrentTrackUi(tracks[0]);
-      }
-    }
+    try {
+        if (code && code.length === 6) {
+            // Join existing family room
+            currentFamily = await supabaseClient.findFamilyByCode(code);
+            if (!currentFamily) {
+                // If not found in cloud, create with that code
+                currentFamily = await supabaseClient.createFamily(name + ' Oilasi');
+            }
+        } else {
+            // Create brand new family room
+            currentFamily = await supabaseClient.createFamily(name + ' Oilasi');
+        }
 
-    renderTrackList(filterQuery = '') {
-      const container = document.getElementById('track-list');
-      if (!container) return;
-      container.innerHTML = '';
-
-      const filtered = this.playlist.filter((t) => {
-        if (!filterQuery) return true;
-        const q = filterQuery.toLowerCase();
-        return (
-          (t.title && t.title.toLowerCase().includes(q)) ||
-          (t.artist && t.artist.toLowerCase().includes(q)) ||
-          (t.album && t.album.toLowerCase().includes(q))
+        // Register profile
+        const avatar = selectedRole === 'parent' ? '👑' : '🧒';
+        currentProfile = await supabaseClient.registerProfile(
+            currentFamily.id,
+            name,
+            selectedRole,
+            avatar
         );
-      });
 
-      filtered.forEach((track, idx) => {
-        const item = document.createElement('div');
-        item.className = 'track-item' + (idx === this.currentIndex ? ' active' : '');
+        document.getElementById('setup-modal').classList.remove('active');
+        document.getElementById('welcome-screen').classList.add('hidden');
 
-        const img = document.createElement('img');
-        img.className = 'track-thumb';
-        img.src =
-          track.albumArt ||
-          'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&q=80';
-        img.onerror = () => {
-          img.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&q=80';
-        };
+        if (window.WabiBridge) window.WabiBridge.triggerHaptic(2);
 
-        const infoCol = document.createElement('div');
-        infoCol.className = 'track-info-col';
+        renderDashboard();
+    } catch (e) {
+        alert('Xatolik yuz berdi: ' + e.message);
+    }
+}
 
-        const title = document.createElement('div');
-        title.className = 'track-item-title';
-        title.textContent = track.title || 'Noma\'lum trek';
+// ============================================================================
+// DASHBOARD RENDERING
+// ============================================================================
+async function renderDashboard() {
+    if (!currentFamily || !currentProfile) return;
 
-        const sub = document.createElement('div');
-        sub.className = 'track-item-sub';
-        sub.textContent = `${track.artist || 'AURA'} • ${track.album || ''}`;
+    // Header info
+    document.getElementById('header-family-name').textContent = currentFamily.family_name || 'Bizning Oila';
+    document.getElementById('header-family-code').textContent = `KOD: ${currentFamily.family_code}`;
+    document.getElementById('header-user-status').textContent = `${currentProfile.name} • ${currentProfile.role === 'parent' ? 'Ota-ona' : 'Farzand'}`;
+    document.getElementById('header-avatar').textContent = currentProfile.avatar_url || (currentProfile.role === 'parent' ? '👑' : '🧒');
 
-        infoCol.appendChild(title);
-        infoCol.appendChild(sub);
+    // Sync Furry Vibe score
+    if (currentProfile.current_vibe_score) {
+        furryVibe.setScore(currentProfile.current_vibe_score);
+    }
 
-        const dur = document.createElement('div');
-        dur.className = 'track-dur';
-        dur.textContent = this.formatTime(track.duration || 0);
+    // Refresh UI components
+    renderUsageStats();
+    renderTasks();
+    renderFamilyMembers();
+    renderAppLimits();
+    updatePermissionPills();
+}
 
-        item.appendChild(img);
-        item.appendChild(infoCol);
-        item.appendChild(dur);
+function copyFamilyCode() {
+    if (!currentFamily) return;
+    navigator.clipboard.writeText(currentFamily.family_code).then(() => {
+        alert(`Oila kodi nusxalandi: ${currentFamily.family_code}\nBuni farzandingiz telefoniga kiriting!`);
+    }).catch(() => {
+        alert(`Oila kodi: ${currentFamily.family_code}`);
+    });
+    if (window.WabiBridge) window.WabiBridge.triggerHaptic(1);
+}
 
-        item.addEventListener('click', () => {
-          this.playIndex(this.playlist.indexOf(track));
-          const backdrop = document.getElementById('library-drawer-backdrop');
-          if (backdrop) backdrop.classList.remove('open');
+// ============================================================================
+// NAMANGAN PRAYER TIMES
+// ============================================================================
+async function loadPrayerTimes() {
+    try {
+        const timings = await supabaseClient.fetchNamanganPrayerTimes();
+        if (timings) {
+            document.querySelector('#p-fajr .prayer-time').textContent = timings.fajr;
+            document.querySelector('#p-dhuhr .prayer-time').textContent = timings.dhuhr;
+            document.querySelector('#p-asr .prayer-time').textContent = timings.asr;
+            document.querySelector('#p-maghrib .prayer-time').textContent = timings.maghrib;
+            document.querySelector('#p-isha .prayer-time').textContent = timings.isha;
+        }
+    } catch (ignored) {}
+}
+
+// ============================================================================
+// SCREEN TIME & REAL USAGE STATS
+// ============================================================================
+function renderUsageStats() {
+    const list = document.getElementById('usage-list');
+    list.innerHTML = '';
+
+    if (!window.WabiBridge || !window.WabiBridge.isUsageStatsPermissionGranted()) {
+        list.innerHTML = `
+            <div style="text-align: center; padding: 14px 0; color: var(--text-secondary); font-size: 13px;">
+                Haqiqiy ilovalar vaqtini ko'rish uchun ruxsat bering.
+                <button class="btn-primary" style="margin-top: 10px; padding: 8px 18px; font-size: 12px; width: auto;" onclick="requestUsagePermission()">
+                    Usage Access Ruxsatini Yoqish
+                </button>
+            </div>
+        `;
+        return;
+    }
+
+    try {
+        const statsJson = window.WabiBridge.getTodayUsageStats();
+        const stats = JSON.parse(statsJson || '[]');
+
+        if (stats.length === 0) {
+            list.innerHTML = `
+                <div style="text-align: center; padding: 12px 0; color: var(--text-muted); font-size: 13px;">
+                    Bugun hali og'ir ilovalar ochilmadi.
+                </div>
+            `;
+            return;
+        }
+
+        // Sort descending by usage minutes
+        stats.sort((a, b) => b.usedMinutes - a.usedMinutes);
+
+        stats.slice(0, 5).forEach(app => {
+            const row = document.createElement('div');
+            row.className = 'usage-app-row';
+            row.innerHTML = `
+                <div class="usage-app-left">
+                    <div class="usage-app-icon">📱</div>
+                    <div>
+                        <div class="usage-app-name">${escapeHtml(app.appName)}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(app.packageName)}</div>
+                    </div>
+                </div>
+                <div class="usage-app-time">${app.usedMinutes} daqiqa</div>
+            `;
+            list.appendChild(row);
         });
+    } catch (e) {
+        list.innerHTML = `<div style="font-size: 13px; color: var(--text-muted); text-align: center;">Ma'lumot olinmoqda...</div>`;
+    }
+}
 
-        container.appendChild(item);
-      });
+function requestUsagePermission() {
+    if (window.WabiBridge) {
+        window.WabiBridge.openUsageStatsSettings();
+    } else {
+        alert("Bu funksiya Android qurilmasida haqiqiy UsageStatsManager orqali ishlaydi.");
+    }
+}
+
+function requestAccessibilityPermission() {
+    if (window.WabiBridge) {
+        window.WabiBridge.openAccessibilitySettings();
+    } else {
+        alert("AccessibilityService sozlamalarini ochish.");
+    }
+}
+
+function updatePermissionPills() {
+    if (!window.WabiBridge) return;
+
+    const isUsage = window.WabiBridge.isUsageStatsPermissionGranted();
+    const usageBtn = document.getElementById('usage-permission-btn');
+    if (usageBtn) {
+        usageBtn.textContent = isUsage ? '✓ Faol' : 'Ruxsat berish';
+        usageBtn.style.color = isUsage ? 'var(--accent-green)' : 'var(--gold)';
     }
 
-    // ========================================================================
-    // 4. PLAYBACK CONTROLLER
-    // ========================================================================
-    playIndex(index) {
-      if (index < 0 || index >= this.playlist.size) return;
-      this.currentIndex = index;
-      const bridge = window.AuraBridge || window.AuraNative;
-      if (bridge && typeof bridge.playTrack === 'function') {
-        bridge.playTrack(index);
-      }
+    const isAccess = window.WabiBridge.isAccessibilityEnabled();
+    const accessBadge = document.getElementById('accessibility-badge');
+    if (accessBadge) {
+        accessBadge.textContent = isAccess ? '✓ Himoya: Faol' : 'Himoya: O\'chiq';
+        accessBadge.style.color = isAccess ? 'var(--accent-green)' : 'var(--accent-red)';
+    }
+}
+
+// ============================================================================
+// TASKS & HABITS
+// ============================================================================
+async function renderTasks() {
+    if (!currentFamily) return;
+
+    const tasks = await supabaseClient.getTasks(currentFamily.id, currentProfile ? currentProfile.id : null);
+    const fullList = document.getElementById('full-tasks-list');
+    const quickList = document.getElementById('quick-tasks-list');
+
+    fullList.innerHTML = '';
+    quickList.innerHTML = '';
+
+    if (tasks.length === 0) {
+        const emptyHtml = `
+            <div style="text-align: center; padding: 24px 0; color: var(--text-secondary); font-size: 14px;">
+                Hozircha birorta ham vazifa belgilanmagan.<br>
+                ${currentProfile && currentProfile.role === 'parent' ? '<b style="color: var(--gold)">"+ Yangi Vazifa"</b> tugmasini bosib vazifa qo\'shing!' : 'Ota-onangiz sizga vazifa berishini kuting.'}
+            </div>
+        `;
+        fullList.innerHTML = emptyHtml;
+        quickList.innerHTML = emptyHtml;
+        return;
     }
 
-    togglePlayPause() {
-      const bridge = window.AuraBridge || window.AuraNative;
-      if (bridge && typeof bridge.togglePlayPause === 'function') {
-        bridge.togglePlayPause();
-      } else {
-        this.isPlaying = !this.isPlaying;
-        this.updatePlayPauseUi();
-      }
-    }
+    tasks.forEach(t => {
+        const item = document.createElement('div');
+        item.className = `task-item ${t.is_completed ? 'completed' : ''}`;
 
-    nextTrack() {
-      const bridge = window.AuraBridge || window.AuraNative;
-      if (bridge && typeof bridge.next === 'function') {
-        bridge.next();
-      }
-    }
+        const isParent = currentProfile && currentProfile.role === 'parent';
 
-    prevTrack() {
-      const bridge = window.AuraBridge || window.AuraNative;
-      if (bridge && typeof bridge.prev === 'function') {
-        bridge.prev();
-      }
-    }
+        item.innerHTML = `
+            <div style="display: flex; align-items: center; width: 100%;">
+                <div class="task-checkbox ${t.is_completed ? 'checked' : ''}" onclick="toggleTask('${t.id}', ${!t.is_completed})">
+                    ${t.is_completed ? '✓' : ''}
+                </div>
+                <div class="task-info">
+                    <div class="task-title">${escapeHtml(t.title)}</div>
+                    <div class="task-meta">
+                        <span class="task-bounty">+${t.reward_points} ball</span>
+                        <span>Muxlat: ${t.deadline || 'Bugun'}</span>
+                        ${t.verified_by_parent ? '<span style="color: var(--accent-green)">✓ Tasdiqlangan</span>' : ''}
+                    </div>
+                </div>
+                ${(isParent && t.is_completed && !t.verified_by_parent) ? `
+                    <button class="btn-verify" onclick="verifyTask('${t.id}', '${t.kid_id}', ${t.reward_points})">Tasdiqlash</button>
+                ` : ''}
+            </div>
+        `;
 
-    seekTo(ms) {
-      const bridge = window.AuraBridge || window.AuraNative;
-      if (bridge && typeof bridge.seekTo === 'function') {
-        bridge.seekTo(ms);
-      }
-    }
-
-    toggleShuffle() {
-      this.isShuffle = !this.isShuffle;
-      const btn = document.getElementById('btn-shuffle');
-      if (btn) btn.classList.toggle('active', this.isShuffle);
-      const bridge = window.AuraBridge || window.AuraNative;
-      if (bridge && typeof bridge.setShuffle === 'function') {
-        bridge.setShuffle(this.isShuffle);
-      }
-    }
-
-    toggleRepeat() {
-      this.repeatMode = (this.repeatMode + 1) % 3;
-      const btn = document.getElementById('btn-repeat');
-      if (btn) {
-        btn.classList.toggle('active', this.repeatMode > 0);
-      }
-      const bridge = window.AuraBridge || window.AuraNative;
-      if (bridge && typeof bridge.setRepeatMode === 'function') {
-        bridge.setRepeatMode(this.repeatMode);
-      }
-    }
-
-    toggleFavorite() {
-      const track = this.playlist[this.currentIndex];
-      if (!track) return;
-      const idStr = String(track.id);
-      const btn = document.getElementById('btn-favorite');
-      if (this.favorites.has(idStr)) {
-        this.favorites.delete(idStr);
-        if (btn) btn.classList.remove('active');
-      } else {
-        this.favorites.add(idStr);
-        if (btn) btn.classList.add('active');
-      }
-      localStorage.setItem('aura_favorites', JSON.stringify([...this.favorites]));
-    }
-
-    // ========================================================================
-    // 5. UI UPDATERS
-    // ========================================================================
-    updateCurrentTrackUi(track) {
-      if (!track) return;
-      const title = document.getElementById('track-title');
-      const artist = document.getElementById('track-artist');
-      const vinylImg = document.getElementById('vinyl-album-img');
-      const favBtn = document.getElementById('btn-favorite');
-
-      if (title) title.textContent = track.title || 'Noma\'lum trek';
-      if (artist) artist.textContent = `${track.artist || 'AURA'} • ${track.album || ''}`;
-
-      const art =
-        track.albumArt ||
-        'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&q=80';
-      if (vinylImg) {
-        vinylImg.src = art;
-        vinylImg.onerror = () => {
-          vinylImg.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&q=80';
-        };
-      }
-
-      if (favBtn) {
-        favBtn.classList.toggle('active', this.favorites.has(String(track.id)));
-      }
-
-      this.durationMs = track.duration || 0;
-      const timeDur = document.getElementById('time-duration');
-      if (timeDur) timeDur.textContent = this.formatTime(this.durationMs);
-
-      // Morph ambient colors based on track title hash
-      this._morphColorsForTrack(track);
-
-      // Highlight active in tracklist
-      document.querySelectorAll('.track-item').forEach((item, idx) => {
-        item.classList.toggle('active', idx === this.currentIndex);
-      });
-    }
-
-    updatePlayPauseUi() {
-      document.body.setAttribute('data-playing', this.isPlaying ? 'true' : 'false');
-      const iconPlay = document.getElementById('icon-play');
-      const iconPause = document.getElementById('icon-pause');
-      if (iconPlay && iconPause) {
-        if (this.isPlaying) {
-          iconPlay.classList.add('hidden');
-          iconPause.classList.remove('hidden');
-        } else {
-          iconPlay.classList.remove('hidden');
-          iconPause.classList.add('hidden');
+        fullList.appendChild(item.cloneNode(true));
+        if (quickList.children.length < 3) {
+            quickList.appendChild(item);
         }
-      }
+    });
+}
+
+async function toggleTask(taskId, newStatus) {
+    if (window.WabiBridge) window.WabiBridge.triggerHaptic(1);
+    await supabaseClient.toggleTaskCompletion(taskId, newStatus);
+    renderTasks();
+}
+
+async function verifyTask(taskId, kidId, rewardPoints) {
+    if (window.WabiBridge) window.WabiBridge.triggerHaptic(2);
+    await supabaseClient.verifyTask(taskId, kidId, rewardPoints);
+    alert("Vazifa muvaffaqiyatli tasdiqlandi va ball berildi! ⭐️");
+    renderTasks();
+}
+
+function openNewTaskModal() {
+    document.getElementById('new-task-modal').style.display = 'flex';
+}
+
+function closeNewTaskModal() {
+    document.getElementById('new-task-modal').style.display = 'none';
+}
+
+async function submitNewTask() {
+    const title = document.getElementById('task-title-input').value.trim();
+    const points = parseInt(document.getElementById('task-points-input').value, 10) || 50;
+    const deadline = document.getElementById('task-deadline-input').value.trim() || '19:00';
+
+    if (!title) {
+        alert("Vazifa nomini kiriting!");
+        return;
     }
 
-    updateProgressUi() {
-      const timeCur = document.getElementById('time-current');
-      const timeDur = document.getElementById('time-duration');
-      const fill = document.getElementById('seek-bar-fill');
-      const thumb = document.getElementById('seek-thumb');
+    await supabaseClient.createTask(
+        currentFamily.id,
+        currentProfile.id,
+        title,
+        points,
+        deadline
+    );
 
-      if (timeCur) timeCur.textContent = this.formatTime(this.currentTimeMs);
-      if (timeDur && this.durationMs > 0) {
-        timeDur.textContent = this.formatTime(this.durationMs);
-      }
+    document.getElementById('task-title-input').value = '';
+    closeNewTaskModal();
+    if (window.WabiBridge) window.WabiBridge.triggerHaptic(2);
+    renderTasks();
+}
 
-      if (this.durationMs > 0) {
-        const pct = Math.min(100, Math.max(0, (this.currentTimeMs / this.durationMs) * 100));
-        if (fill) fill.style.width = `${pct}%`;
-        if (thumb) thumb.style.left = `${pct}%`;
-      }
+// ============================================================================
+// VIBE SAVING (1-VIDEO)
+// ============================================================================
+async function saveCurrentVibe() {
+    if (!currentProfile) return;
+    const score = furryVibe.score;
+    await supabaseClient.updateVibeScore(currentProfile.id, score);
+    if (window.WabiBridge) window.WabiBridge.triggerHaptic(2);
+    alert(`Kayfiyatingiz (${score}%) muvaffaqiyatli saqlandi va oilangizga ko'rindi! ✨`);
+}
+
+// ============================================================================
+// FAMILY & APP LIMITS
+// ============================================================================
+async function renderFamilyMembers() {
+    if (!currentFamily) return;
+    const members = await supabaseClient.getFamilyMembers(currentFamily.id);
+    const list = document.getElementById('family-members-list');
+    list.innerHTML = '';
+
+    members.forEach(m => {
+        const row = document.createElement('div');
+        row.className = 'usage-app-row';
+        row.innerHTML = `
+            <div class="usage-app-left">
+                <div class="usage-app-icon">${m.avatar_url || (m.role === 'parent' ? '👑' : '🧒')}</div>
+                <div>
+                    <div class="usage-app-name">${escapeHtml(m.name)}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">${m.role === 'parent' ? 'Ota-ona' : 'Farzand'} • ${m.total_points || 0} ball</div>
+                </div>
+            </div>
+            <div class="card-badge" style="background: rgba(106, 181, 71, 0.15); color: var(--accent-green);">
+                Vibe: ${m.current_vibe_score || 75}%
+            </div>
+        `;
+        list.appendChild(row);
+    });
+}
+
+async function renderAppLimits() {
+    const list = document.getElementById('app-limits-list');
+    list.innerHTML = '';
+
+    let installed = [];
+    if (window.WabiBridge) {
+        try {
+            installed = JSON.parse(window.WabiBridge.getInstalledApps() || '[]');
+        } catch (ignored) {}
     }
 
-    formatTime(ms) {
-      const totalSec = Math.floor(ms / 1000);
-      const min = Math.floor(totalSec / 60);
-      const sec = totalSec % 60;
-      return `${min}:${String(sec).padStart(2, '0')}`;
+    if (installed.length === 0) {
+        // Default target apps for smart discipline
+        installed = [
+            { packageName: 'com.instagram.android', appName: 'Instagram' },
+            { packageName: 'com.zhiliaoapp.musically', appName: 'TikTok' },
+            { packageName: 'com.google.android.youtube', appName: 'YouTube' },
+            { packageName: 'org.telegram.messenger', appName: 'Telegram' },
+            { packageName: 'com.dts.freefireth', appName: 'Free Fire' }
+        ];
     }
 
-    _morphColorsForTrack(track) {
-      const palettes = [
-        { primary: '#00f0ff', secondary: '#9d4edd', tertiary: '#ff2a85' },
-        { primary: '#ff007f', secondary: '#7928ca', tertiary: '#00f0ff' },
-        { primary: '#00ffa3', secondary: '#0070f3', tertiary: '#7928ca' },
-        { primary: '#ff6b00', secondary: '#ff0055', tertiary: '#6800ff' },
-      ];
-      const code = Math.abs(String(track.id || track.title).charCodeAt(0) || 0);
-      this.currentPalette = palettes[code % palettes.length];
+    const limits = currentFamily ? await supabaseClient.getAppLimits(currentFamily.id, currentProfile ? currentProfile.id : null) : [];
+
+    installed.slice(0, 6).forEach(app => {
+        const saved = limits.find(l => l.package_name === app.packageName);
+        const isLocked = saved ? saved.is_locked : false;
+        const maxMinutes = saved ? saved.max_minutes_per_day : 30;
+
+        const row = document.createElement('div');
+        row.className = 'usage-app-row';
+        row.innerHTML = `
+            <div class="usage-app-left">
+                <div class="usage-app-icon">🛡️</div>
+                <div>
+                    <div class="usage-app-name">${escapeHtml(app.appName)}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(app.packageName)}</div>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 12px; color: var(--gold); font-weight: 700;">${maxMinutes}m</span>
+                <button class="btn-verify" style="background: ${isLocked ? 'var(--accent-red)' : 'rgba(255,255,255,0.08)'}; color: #FFF;" onclick="toggleLock('${app.packageName}', '${escapeHtml(app.appName)}', ${!isLocked}, ${maxMinutes})">
+                    ${isLocked ? 'Qulflangan 🔒' : 'Qulflash 🔓'}
+                </button>
+            </div>
+        `;
+        list.appendChild(row);
+    });
+}
+
+async function toggleLock(pkg, appName, newLocked, maxMinutes) {
+    if (!currentFamily || !currentProfile) return;
+    await supabaseClient.saveAppLimit(currentFamily.id, currentProfile.id, pkg, appName, maxMinutes, newLocked);
+    if (window.WabiBridge) window.WabiBridge.triggerHaptic(2);
+    renderAppLimits();
+}
+
+// ============================================================================
+// TAB NAVIGATION
+// ============================================================================
+function switchTab(tabName) {
+    document.querySelectorAll('.view-container').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+    const view = document.getElementById(`view-${tabName}`);
+    const nav = document.getElementById(`nav-${tabName}`);
+    if (view) view.classList.add('active');
+    if (nav) nav.classList.add('active');
+
+    if (window.WabiBridge) window.WabiBridge.triggerHaptic(1);
+
+    if (tabName === 'vibe' && furryVibe) {
+        setTimeout(() => furryVibe.resize(), 50);
     }
+}
 
-    // ========================================================================
-    // 6. 3D TURNTABLE DJ SCRATCH INTERACTION
-    // ========================================================================
-    _setupVinylScratchInteractions() {
-      const disc = document.getElementById('vinyl-disc');
-      if (!disc) return;
-
-      let isScratching = false;
-      let startAngle = 0;
-      let lastScrubTime = 0;
-
-      const getAngle = (e, rect) => {
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height / 2;
-        const x = (e.touches ? e.touches[0].clientX : e.clientX) - cx;
-        const y = (e.touches ? e.touches[0].clientY : e.clientY) - cy;
-        return Math.atan2(y, x);
-      };
-
-      const onStart = (e) => {
-        isScratching = true;
-        const rect = disc.getBoundingClientRect();
-        startAngle = getAngle(e, rect);
-      };
-
-      const onMove = (e) => {
-        if (!isScratching) return;
-        const rect = disc.getBoundingClientRect();
-        const currentAngle = getAngle(e, rect);
-        const delta = currentAngle - startAngle;
-        startAngle = currentAngle;
-
-        const now = Date.now();
-        if (now - lastScrubTime > 120 && this.durationMs > 0) {
-          lastScrubTime = now;
-          const seekOffset = delta * 4000;
-          const newTarget = Math.max(0, Math.min(this.durationMs, this.currentTimeMs + seekOffset));
-          this.seekTo(newTarget);
-        }
-      };
-
-      const onEnd = () => {
-        isScratching = false;
-      };
-
-      disc.addEventListener('mousedown', onStart);
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener('mouseup', onEnd);
-
-      disc.addEventListener('touchstart', onStart, { passive: true });
-      window.addEventListener('touchmove', onMove, { passive: true });
-      window.addEventListener('touchend', onEnd);
-    }
-
-    // ========================================================================
-    // 7. 60 FPS DYNAMIC AMBIENT MESH GLOW CANVAS
-    // ========================================================================
-    _startAmbientCanvasLoop() {
-      const canvas = document.getElementById('ambient-mesh-canvas');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-
-      const resize = () => {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-      };
-      resize();
-      window.addEventListener('resize', resize);
-
-      let p = 0;
-      const loop = () => {
-        p += this.isPlaying ? 0.015 : 0.005;
-        const w = canvas.width;
-        const h = canvas.height;
-
-        ctx.clearRect(0, 0, w, h);
-
-        // Radial Mesh Blob 1 (Top Left)
-        const x1 = w * 0.35 + Math.sin(p * 0.8) * 80;
-        const y1 = h * 0.3 + Math.cos(p * 0.7) * 90;
-        const r1 = Math.min(w, h) * 0.65;
-        const g1 = ctx.createRadialGradient(x1, y1, 10, x1, y1, r1);
-        g1.addColorStop(0, this.currentPalette.primary);
-        g1.addColorStop(0.5, 'transparent');
-        ctx.fillStyle = g1;
-        ctx.fillRect(0, 0, w, h);
-
-        // Radial Mesh Blob 2 (Center Right)
-        const x2 = w * 0.7 + Math.cos(p * 0.6) * 70;
-        const y2 = h * 0.45 + Math.sin(p * 0.9) * 80;
-        const r2 = Math.min(w, h) * 0.55;
-        const g2 = ctx.createRadialGradient(x2, y2, 10, x2, y2, r2);
-        g2.addColorStop(0, this.currentPalette.secondary);
-        g2.addColorStop(0.5, 'transparent');
-        ctx.fillStyle = g2;
-        ctx.fillRect(0, 0, w, h);
-
-        // Radial Mesh Blob 3 (Bottom Center)
-        const x3 = w * 0.5 + Math.sin(p * 0.5) * 60;
-        const y3 = h * 0.75 + Math.cos(p * 0.4) * 50;
-        const r3 = Math.min(w, h) * 0.7;
-        const g3 = ctx.createRadialGradient(x3, y3, 10, x3, y3, r3);
-        g3.addColorStop(0, this.currentPalette.tertiary);
-        g3.addColorStop(0.5, 'transparent');
-        ctx.fillStyle = g3;
-        ctx.fillRect(0, 0, w, h);
-
-        requestAnimationFrame(loop);
-      };
-      requestAnimationFrame(loop);
-    }
-
-    // ========================================================================
-    // 8. 60/120 FPS LIVE SPECTRUM VISUALIZER (Waveform + Neon Bars)
-    // ========================================================================
-    _startSpectrumVisualizerLoop() {
-      const canvas = document.getElementById('live-spectrum-canvas');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-
-      const resize = () => {
-        canvas.width = canvas.clientWidth || 320;
-        canvas.height = canvas.clientHeight || 220;
-      };
-      resize();
-      window.addEventListener('resize', resize);
-
-      const barCount = 42;
-      let phase = 0;
-
-      const loop = () => {
-        phase += this.isPlaying ? 0.05 : 0.01;
-        const w = canvas.width;
-        const h = canvas.height;
-        ctx.clearRect(0, 0, w, h);
-
-        const energy = this.isPlaying ? 0.85 : 0.15;
-        const barWidth = (w / barCount) * 0.65;
-        const gap = (w / barCount) * 0.35;
-
-        // Draw Mirrored Neon Spectrum Bars
-        ctx.shadowBlur = 14;
-        ctx.shadowColor = this.currentPalette.primary;
-
-        for (let i = 0; i < barCount; i++) {
-          const norm = i / barCount;
-          const wave =
-            Math.sin(norm * Math.PI * 3 + phase * 2.5) * 0.4 +
-            Math.cos(norm * Math.PI * 6 - phase * 1.8) * 0.3 +
-            Math.sin(phase * 4 + i * 0.2) * 0.3;
-
-          const barHeight = Math.max(6, Math.abs(wave) * (h * 0.45) * energy);
-          const x = i * (barWidth + gap);
-          const y = h / 2 - barHeight / 2;
-
-          const grad = ctx.createLinearGradient(0, y, 0, y + barHeight);
-          grad.addColorStop(0, this.currentPalette.primary);
-          grad.addColorStop(0.5, this.currentPalette.secondary);
-          grad.addColorStop(1, this.currentPalette.tertiary);
-
-          ctx.fillStyle = grad;
-          ctx.beginPath();
-          ctx.roundRect(x, y, barWidth, barHeight, 4);
-          ctx.fill();
-        }
-
-        ctx.shadowBlur = 0;
-        requestAnimationFrame(loop);
-      };
-      requestAnimationFrame(loop);
-    }
-  }
-
-  // Initialize AURA player on DOM Ready
-  window.addEventListener('DOMContentLoaded', () => {
-    window.Aura = new AuraPlayer();
-  });
-})();
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
