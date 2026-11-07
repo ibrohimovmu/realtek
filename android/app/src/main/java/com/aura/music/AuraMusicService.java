@@ -11,14 +11,19 @@ import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ServiceInfo;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.drawable.Icon;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
+import android.media.MediaMetadata;
 import android.media.MediaPlayer;
 import android.media.audiofx.BassBoost;
 import android.media.audiofx.Equalizer;
+import android.media.session.MediaSession;
+import android.media.session.PlaybackState;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Build;
@@ -27,11 +32,6 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.MediaStore;
-import android.support.v4.media.MediaMetadataCompat;
-import android.support.v4.media.session.MediaSessionCompat;
-import android.support.v4.media.session.PlaybackStateCompat;
-
-import androidx.core.app.NotificationCompat;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -42,12 +42,13 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * AURA Foreground Music Service.
- * - Handles gapless MediaPlayer playback, playlist queue, shuffle, repeat.
- * - Manages Android MediaSessionCompat for system lock screen & Bluetooth controls.
- * - 5-Band Hardware Equalizer + BassBoost.
- * - Sleep Timer with smooth volume fade-out.
- * - Audio becoming noisy (headphone disconnect) auto-pause.
+ * AURA Native Foreground Music Service (API 26 - 35).
+ * - Gapless MediaPlayer audio playback engine.
+ * - Native Android MediaSession for Lock Screen & Bluetooth Controls.
+ * - System Notification with MediaStyle and lockscreen controls.
+ * - 5-Band Equalizer & BassBoost.
+ * - Sleep Timer with volume fade-out.
+ * - Headphone disconnect auto-pause.
  */
 public class AuraMusicService extends Service implements MediaPlayer.OnPreparedListener,
         MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener {
@@ -57,13 +58,13 @@ public class AuraMusicService extends Service implements MediaPlayer.OnPreparedL
     public static final String ACTION_PREV = "com.aura.music.ACTION_PREV";
     public static final String ACTION_STOP = "com.aura.music.ACTION_STOP";
 
-    private static final String CHANNEL_ID = "aura_media_playback";
-    private static final int NOTIF_ID = 1001;
+    private static final String CHANNEL_ID = "aura_playback_channel";
+    private static final int NOTIF_ID = 2026;
 
     private static AuraMusicService instance;
 
     private MediaPlayer mediaPlayer;
-    private MediaSessionCompat mediaSession;
+    private MediaSession mediaSession;
     private Equalizer equalizer;
     private BassBoost bassBoost;
 
@@ -126,10 +127,8 @@ public class AuraMusicService extends Service implements MediaPlayer.OnPreparedL
         createNotificationChannel();
         registerNoisyReceiver();
 
-        // Load initial built-in / sample tracks
         loadDefaultSampleTracks();
 
-        // Start periodic tick to update Web UI & Sleep Timer
         handler.post(progressTicker);
     }
 
@@ -169,8 +168,8 @@ public class AuraMusicService extends Service implements MediaPlayer.OnPreparedL
     }
 
     private void initMediaSession() {
-        mediaSession = new MediaSessionCompat(this, "AuraMusicSession");
-        mediaSession.setCallback(new MediaSessionCompat.Callback() {
+        mediaSession = new MediaSession(this, "AuraMediaSession");
+        mediaSession.setCallback(new MediaSession.Callback() {
             @Override
             public void onPlay() {
                 resume();
@@ -267,7 +266,7 @@ public class AuraMusicService extends Service implements MediaPlayer.OnPreparedL
             mediaPlayer.prepareAsync();
 
             updateMediaSessionMetadata(track);
-            updatePlaybackState(PlaybackStateCompat.STATE_BUFFERING, 0);
+            updatePlaybackState(PlaybackState.STATE_BUFFERING, 0);
             startForegroundNotification(track, true);
 
             MainActivity.notifyJs("onTrackChanged", track.toJson().toString());
@@ -281,7 +280,7 @@ public class AuraMusicService extends Service implements MediaPlayer.OnPreparedL
             mediaPlayer.pause();
             Track cur = getCurrentTrack();
             if (cur != null) {
-                updatePlaybackState(PlaybackStateCompat.STATE_PAUSED, mediaPlayer.getCurrentPosition());
+                updatePlaybackState(PlaybackState.STATE_PAUSED, mediaPlayer.getCurrentPosition());
                 startForegroundNotification(cur, false);
             }
             MainActivity.notifyJs("onPlaybackState", "{\"state\":\"paused\",\"position\":"
@@ -294,7 +293,7 @@ public class AuraMusicService extends Service implements MediaPlayer.OnPreparedL
             mediaPlayer.start();
             Track cur = getCurrentTrack();
             if (cur != null) {
-                updatePlaybackState(PlaybackStateCompat.STATE_PLAYING, mediaPlayer.getCurrentPosition());
+                updatePlaybackState(PlaybackState.STATE_PLAYING, mediaPlayer.getCurrentPosition());
                 startForegroundNotification(cur, true);
             }
             MainActivity.notifyJs("onPlaybackState", "{\"state\":\"playing\",\"position\":"
@@ -310,7 +309,7 @@ public class AuraMusicService extends Service implements MediaPlayer.OnPreparedL
     public void seekTo(int msec) {
         if (mediaPlayer != null) {
             mediaPlayer.seekTo(msec);
-            updatePlaybackState(isPlaying() ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_PAUSED, msec);
+            updatePlaybackState(isPlaying() ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED, msec);
         }
     }
 
@@ -422,7 +421,6 @@ public class AuraMusicService extends Service implements MediaPlayer.OnPreparedL
             return;
         }
 
-        // Fade out volume in the last 30 seconds
         if (diff < 30_000L) {
             float fade = (float) diff / 30_000f;
             setPlayerVolume(Math.max(0.05f, fade));
@@ -486,7 +484,7 @@ public class AuraMusicService extends Service implements MediaPlayer.OnPreparedL
         mp.start();
         Track cur = getCurrentTrack();
         if (cur != null) {
-            updatePlaybackState(PlaybackStateCompat.STATE_PLAYING, 0);
+            updatePlaybackState(PlaybackState.STATE_PLAYING, 0);
             startForegroundNotification(cur, true);
         }
         MainActivity.notifyJs("onPlaybackState", "{\"state\":\"playing\",\"position\":0,\"duration\":"
@@ -495,7 +493,7 @@ public class AuraMusicService extends Service implements MediaPlayer.OnPreparedL
 
     @Override
     public void onCompletion(MediaPlayer mp) {
-        if (repeatMode == 2) { // repeat one
+        if (repeatMode == 2) {
             seekTo(0);
             resume();
         } else {
@@ -542,7 +540,7 @@ public class AuraMusicService extends Service implements MediaPlayer.OnPreparedL
                     do {
                         long id = cursor.getLong(idCol);
                         long duration = cursor.getLong(durCol);
-                        if (duration < 15_000) continue; // Skip audio clips shorter than 15s
+                        if (duration < 15_000) continue;
 
                         String title = cursor.getString(titleCol);
                         String artist = cursor.getString(artistCol);
@@ -573,7 +571,6 @@ public class AuraMusicService extends Service implements MediaPlayer.OnPreparedL
                     playlist.clear();
                     playlist.addAll(found);
                 } else {
-                    // Fallback to sample tracks
                     loadDefaultSampleTracks();
                 }
                 notifyTracksLoaded();
@@ -584,7 +581,6 @@ public class AuraMusicService extends Service implements MediaPlayer.OnPreparedL
     private void loadDefaultSampleTracks() {
         playlist.clear();
 
-        // 4 Ambient & Cyberpunk Masterpieces (royalty-free CDN streams with high quality tags)
         Track t1 = new Track();
         t1.id = 101;
         t1.title = "Cyber Pulse (Synthwave)";
@@ -647,7 +643,7 @@ public class AuraMusicService extends Service implements MediaPlayer.OnPreparedL
     }
 
     // ========================================================================
-    // SYSTEM NOTIFICATION & MEDIASESSION (Android 11 - 15 Lock Screen)
+    // NATIVE SYSTEM NOTIFICATION & MEDIASESSION (Android 11 - 15 Lock Screen)
     // ========================================================================
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -666,17 +662,17 @@ public class AuraMusicService extends Service implements MediaPlayer.OnPreparedL
 
     private void updateMediaSessionMetadata(Track track) {
         if (mediaSession == null || track == null) return;
-        MediaMetadataCompat.Builder b = new MediaMetadataCompat.Builder()
-                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, track.title)
-                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, track.artist)
-                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, track.album)
-                .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, track.duration);
+        MediaMetadata.Builder b = new MediaMetadata.Builder()
+                .putString(MediaMetadata.METADATA_KEY_TITLE, track.title)
+                .putString(MediaMetadata.METADATA_KEY_ARTIST, track.artist)
+                .putString(MediaMetadata.METADATA_KEY_ALBUM, track.album)
+                .putLong(MediaMetadata.METADATA_KEY_DURATION, track.duration);
 
         try {
             Bitmap art = loadAlbumArtBitmap(track);
             if (art != null) {
-                b.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, art);
-                b.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, art);
+                b.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, art);
+                b.putBitmap(MediaMetadata.METADATA_KEY_ART, art);
             }
         } catch (Throwable ignored) {}
 
@@ -685,14 +681,14 @@ public class AuraMusicService extends Service implements MediaPlayer.OnPreparedL
 
     private void updatePlaybackState(int state, long position) {
         if (mediaSession == null) return;
-        long actions = PlaybackStateCompat.ACTION_PLAY
-                | PlaybackStateCompat.ACTION_PAUSE
-                | PlaybackStateCompat.ACTION_SKIP_TO_NEXT
-                | PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
-                | PlaybackStateCompat.ACTION_SEEK_TO
-                | PlaybackStateCompat.ACTION_STOP;
+        long actions = PlaybackState.ACTION_PLAY
+                | PlaybackState.ACTION_PAUSE
+                | PlaybackState.ACTION_SKIP_TO_NEXT
+                | PlaybackState.ACTION_SKIP_TO_PREVIOUS
+                | PlaybackState.ACTION_SEEK_TO
+                | PlaybackState.ACTION_STOP;
 
-        mediaSession.setPlaybackState(new PlaybackStateCompat.Builder()
+        mediaSession.setPlaybackState(new PlaybackState.Builder()
                 .setActions(actions)
                 .setState(state, position, 1.0f)
                 .build());
@@ -725,33 +721,54 @@ public class AuraMusicService extends Service implements MediaPlayer.OnPreparedL
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
-        androidx.media.app.NotificationCompat.MediaStyle mediaStyle =
-                new androidx.media.app.NotificationCompat.MediaStyle()
-                        .setMediaSession(mediaSession.getSessionToken())
-                        .setShowActionsInCompactView(0, 1, 2);
+        Notification.MediaStyle mediaStyle = new Notification.MediaStyle()
+                .setMediaSession(mediaSession.getSessionToken())
+                .setShowActionsInCompactView(0, 1, 2);
 
         int playPauseIcon = isPlaying ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play;
 
-        NotificationCompat.Builder notif = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_media_play)
+        Notification.Builder notifBuilder;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            notifBuilder = new Notification.Builder(this, CHANNEL_ID);
+        } else {
+            notifBuilder = new Notification.Builder(this);
+        }
+
+        notifBuilder.setSmallIcon(android.R.drawable.ic_media_play)
                 .setContentTitle(track.title)
                 .setContentText(track.artist + " • " + track.album)
                 .setContentIntent(openAppPi)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
                 .setStyle(mediaStyle)
-                .addAction(android.R.drawable.ic_media_previous, "Previous", prevPi)
-                .addAction(playPauseIcon, isPlaying ? "Pause" : "Play", togglePi)
-                .addAction(android.R.drawable.ic_media_next, "Next", nextPi)
+                .addAction(new Notification.Action.Builder(
+                        Icon.createWithResource(this, android.R.drawable.ic_media_previous),
+                        "Previous", prevPi).build())
+                .addAction(new Notification.Action.Builder(
+                        Icon.createWithResource(this, playPauseIcon),
+                        isPlaying ? "Pause" : "Play", togglePi).build())
+                .addAction(new Notification.Action.Builder(
+                        Icon.createWithResource(this, android.R.drawable.ic_media_next),
+                        "Next", nextPi).build())
                 .setOngoing(isPlaying);
 
         Bitmap art = loadAlbumArtBitmap(track);
         if (art != null) {
-            notif.setLargeIcon(art);
+            notifBuilder.setLargeIcon(art);
         }
 
+        Notification notification = notifBuilder.build();
+
         try {
-            startForeground(NOTIF_ID, notif.build());
-        } catch (Throwable ignored) {}
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIF_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+            } else {
+                startForeground(NOTIF_ID, notification);
+            }
+        } catch (Throwable ignored) {
+            try {
+                startForeground(NOTIF_ID, notification);
+            } catch (Throwable ignored2) {}
+        }
     }
 
     private Bitmap loadAlbumArtBitmap(Track track) {
@@ -771,7 +788,7 @@ public class AuraMusicService extends Service implements MediaPlayer.OnPreparedL
     }
 
     // ========================================================================
-    // PERIODIC PROGRESS TICKER (Dispatches to Web UI & Sleep Timer)
+    // PERIODIC PROGRESS TICKER
     // ========================================================================
     private final Runnable progressTicker = new Runnable() {
         @Override
