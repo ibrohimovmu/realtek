@@ -42,18 +42,8 @@ jobs:
       - name: Build AURA Music APK (API 26 - API 35)
         working-directory: android
         run: |
-          gradle assembleDebug --stacktrace > ../gradle-output.txt 2>&1 || true
-
-      - name: Verify and Print Build Output
-        run: |
-          echo "### Gradle Build Output" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat gradle-output.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "==================== FULL GRADLE OUTPUT ===================="
-          cat gradle-output.txt
-          echo "============================================================"
-          grep "BUILD SUCCESSFUL" gradle-output.txt
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
 
       - name: Package APK Files
         run: |
