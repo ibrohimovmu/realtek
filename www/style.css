@@ -1,11 +1,20 @@
 /* ============================================================================
- * NOVA — 100% TRANSLUCENT EDGE GLOW + SPRING LIQUID PLASMA ORB (style.css)
- * - No grey box on launch! No keyboard icons!
- * - 4-Sided Gemini Live Edge Glow + Bottom Particle Mist
- * - Spring Slide-Up (cubic-bezier(0.22, 1, 0.36, 1)) 3D Liquid Plasma Sphere
- * - Boxless Blur-Fade Neon-White Live Speech Words above the Sphere
- * - Minimalist Dark Glassmorphism Capsule ONLY when AI responds
+ * AURA NEXT-GEN MUSIC PLAYER - STYLESHEET
+ * 120 FPS Vinyl Animation, Ambient Mesh Glow & Frosted Glassmorphism
  * ============================================================================ */
+
+:root {
+  --bg-deep: #07070b;
+  --bg-card: rgba(18, 20, 29, 0.75);
+  --primary: #00f0ff;
+  --primary-glow: rgba(0, 240, 255, 0.45);
+  --secondary: #9d4edd;
+  --text-main: #f8fafc;
+  --text-dim: #94a3b8;
+  --accent-pink: #ff2a85;
+  --border-glass: rgba(255, 255, 255, 0.08);
+  --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "SF Pro Display", sans-serif;
+}
 
 * {
   box-sizing: border-box;
@@ -15,603 +24,941 @@
   user-select: none;
 }
 
-html,
-body {
-  width: 100vw;
-  height: 100vh;
+html, body {
+  width: 100%;
+  height: 100%;
   overflow: hidden;
-  background: transparent !important;
-  background-color: rgba(0, 0, 0, 0) !important;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  color: #ffffff;
+  background-color: var(--bg-deep);
+  color: var(--text-main);
+  font-family: var(--font-main);
 }
 
 /* ============================================================================
- * 1. TOP TRANSPARENT DISMISS AREA (Reveals Launcher & Apps Behind)
+ * 1. DYNAMIC AMBIENT MESH GLOW CANVAS
  * ============================================================================ */
-#transparent-dismiss-zone {
+#ambient-mesh-canvas {
   position: fixed;
   inset: 0;
+  width: 100%;
+  height: 100%;
   z-index: 1;
-  background: transparent !important;
-  cursor: pointer;
+  pointer-events: none;
+  opacity: 0.85;
+  transition: opacity 0.5s ease;
 }
 
-/* ============================================================================
- * 2. ULTRA-THIN CYBER NEON EDGE RIM & GEMINI CORNER BRACKETS
- * ============================================================================ */
-#edge-glow-container {
+#ambient-overlay-sheen {
   position: fixed;
   inset: 0;
   z-index: 2;
   pointer-events: none;
-  opacity: 0;
-  animation: edgeFadeIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-@keyframes edgeFadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.992);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* Ultra-thin (1.5px) neon gradient cyber border rim */
-.neon-edge-border {
-  position: absolute;
-  inset: 7px;
-  border-radius: 30px;
-  border: 1.5px solid rgba(0, 240, 255, 0.72);
-  box-shadow:
-    0 0 10px 1px rgba(0, 240, 255, 0.45),
-    inset 0 0 8px 1px rgba(0, 150, 255, 0.22);
-  transition: all 0.28s ease;
-}
-
-body[data-speaking-active="true"] .neon-edge-border {
-  border-color: rgba(56, 189, 248, 0.95);
-  box-shadow:
-    0 0 16px 2px rgba(0, 240, 255, 0.75),
-    inset 0 0 12px 2px rgba(56, 189, 248, 0.35);
-}
-
-/* Gemini Live Top & Bottom Corner Brackets */
-.cyber-corner {
-  position: absolute;
-  width: 28px;
-  height: 28px;
-  border: 2.5px solid #ffffff;
-  pointer-events: none;
-  opacity: 0.92;
-  transition: border-color 0.25s ease, box-shadow 0.25s ease;
-}
-
-.corner-tl {
-  top: 10px;
-  left: 10px;
-  border-right: none;
-  border-bottom: none;
-  border-top-left-radius: 24px;
-  box-shadow: -2px -2px 10px rgba(0, 240, 255, 0.65);
-}
-
-.corner-tr {
-  top: 10px;
-  right: 10px;
-  border-left: none;
-  border-bottom: none;
-  border-top-right-radius: 24px;
-  box-shadow: 2px -2px 10px rgba(0, 240, 255, 0.65);
-}
-
-.corner-bl {
-  bottom: 10px;
-  left: 10px;
-  border-right: none;
-  border-top: none;
-  border-bottom-left-radius: 24px;
-  box-shadow: -2px 2px 10px rgba(0, 240, 255, 0.65);
-}
-
-.corner-br {
-  bottom: 10px;
-  right: 10px;
-  border-left: none;
-  border-top: none;
-  border-bottom-right-radius: 24px;
-  box-shadow: 2px 2px 10px rgba(0, 240, 255, 0.65);
-}
-
-body[data-speaking-active="true"] .cyber-corner {
-  border-color: #00f0ff;
-  box-shadow: 0 0 14px rgba(0, 240, 255, 0.9);
-}
-
-#bottom-mist-canvas {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  height: 100px;
-  opacity: 0.35;
-  pointer-events: none;
+  background: radial-gradient(circle at 50% 25%, transparent 30%, rgba(7, 7, 11, 0.75) 85%);
 }
 
 /* ============================================================================
- * 3. BOTTOM COMPACT STAGE (Spring Slide-Up Container)
+ * 2. MAIN APP SHELL
  * ============================================================================ */
-#bottom-orb-stage {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+#aura-app {
+  position: relative;
   z-index: 10;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 20px calc(24px + env(safe-area-inset-bottom, 0px)) 20px;
+}
+
+/* ============================================================================
+ * 3. TOP NAVIGATION HEADER
+ * ============================================================================ */
+#top-header {
+  display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding: 0 20px calc(22px + env(safe-area-inset-bottom, 0px)) 20px;
+  justify-content: space-between;
+  min-height: 44px;
+}
+
+.brand-title {
+  text-align: center;
+}
+
+.brand-name {
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  background: linear-gradient(135deg, #00f0ff, #a855f7, #ff2a85);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 20px rgba(0, 240, 255, 0.35);
+}
+
+.brand-sub {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  color: rgba(226, 232, 240, 0.6);
+  margin-top: 1px;
+}
+
+.icon-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--text-main);
+  border-radius: 999px;
+  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.icon-btn:active {
+  transform: scale(0.92);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.pill-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--primary);
+  background: rgba(0, 240, 255, 0.12);
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.top-actions .icon-btn {
+  padding: 8px;
+  width: 38px;
+  height: 38px;
+  justify-content: center;
+}
+
+/* ============================================================================
+ * 4. VIEW MODE TABS (VINYL | VISUALIZER | LYRICS)
+ * ============================================================================ */
+#view-mode-tabs {
+  display: flex;
+  align-self: center;
+  margin: 10px 0 16px 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-glass);
+  padding: 3px;
+  border-radius: 999px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.mode-tab {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.mode-tab.active {
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.22), rgba(157, 78, 221, 0.25));
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.25);
+}
+
+/* ============================================================================
+ * 5. DYNAMIC CENTER STAGE
+ * ============================================================================ */
+#center-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: 280px;
+}
+
+.stage-section {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  transform: scale(0.96);
+}
+
+.stage-section.active {
+  display: flex;
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ============================================================================
+ * 6. 3D TURNTABLE, SPINNING VINYL & MOVING TONEARM
+ * ============================================================================ */
+#turntable-container {
+  position: relative;
+  width: min(82vw, 320px);
+  height: min(82vw, 320px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.turntable-platter {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #1a1a24 0%, #0d0d13 70%, #000000 100%);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.8),
+    0 0 35px var(--primary-glow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid rgba(255, 255, 255, 0.08);
+}
+
+.vinyl-disc {
+  position: relative;
+  width: 93%;
+  height: 93%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #181820 0%, #0c0c11 100%);
+  box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+}
+
+/* Grooves on vinyl surface */
+.vinyl-groove {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px dashed rgba(255, 255, 255, 0.06);
   pointer-events: none;
 }
 
-/* Proactive Accessibility Permission Alert Banner */
-.acc-perm-banner {
-  max-width: 400px;
-  width: calc(100% - 24px);
-  margin-bottom: 14px;
-  padding: 12px 14px;
-  border-radius: 20px;
-  background: rgba(15, 23, 42, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(0, 240, 255, 0.45);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 16px rgba(0, 240, 255, 0.28);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  pointer-events: auto;
-  animation: bannerSlideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+.groove-outer {
+  width: 86%;
+  height: 86%;
+  border-width: 1.5px;
 }
 
-.acc-perm-banner.hidden {
+.groove-mid {
+  width: 68%;
+  height: 68%;
+  border-width: 1px;
+}
+
+.groove-inner {
+  width: 52%;
+  height: 52%;
+  border-width: 1px;
+}
+
+/* Dynamic rotating sheen reflection */
+.vinyl-sheen-highlight {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 45deg,
+    rgba(255, 255, 255, 0.12) 0deg,
+    transparent 60deg,
+    rgba(255, 255, 255, 0.16) 120deg,
+    transparent 180deg,
+    rgba(255, 255, 255, 0.12) 240deg,
+    transparent 300deg,
+    rgba(255, 255, 255, 0.16) 360deg
+  );
+  pointer-events: none;
+  opacity: 0.65;
+}
+
+/* Center Album Label */
+.vinyl-label-wrapper {
+  position: relative;
+  width: 38%;
+  height: 38%;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 0 16px rgba(0, 0, 0, 0.9);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#vinyl-album-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vinyl-spindle-hole {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #000000;
+  border: 2px solid #silver;
+  box-shadow: inset 0 0 4px #ffffff;
+}
+
+/* Continuous 33.3 RPM Vinyl Spin Animation */
+@keyframes spinVinyl {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+body[data-playing="true"] .vinyl-disc {
+  animation: spinVinyl 3.6s linear infinite;
+}
+
+/* Mechanical Tonearm / Stylus */
+.tonearm {
+  position: absolute;
+  top: -12px;
+  right: -8px;
+  width: 60px;
+  height: 140px;
+  pointer-events: none;
+  transform-origin: 30px 15px;
+  transform: rotate(0deg); /* 0deg = off record */
+  transition: transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 5;
+}
+
+body[data-playing="true"] .tonearm {
+  transform: rotate(26deg); /* 26deg = needle placed onto record! */
+}
+
+.tonearm-pivot {
+  position: absolute;
+  top: 5px;
+  left: 20px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #d4d4d8, #52525b);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.8);
+  border: 1px solid #ffffff;
+}
+
+.tonearm-rod {
+  position: absolute;
+  top: 25px;
+  left: 30px;
+  width: 4px;
+  height: 90px;
+  background: linear-gradient(to right, #e4e4e7, #71717a);
+  border-radius: 2px;
+  box-shadow: 2px 4px 8px rgba(0, 0, 0, 0.6);
+}
+
+.tonearm-head {
+  position: absolute;
+  top: 110px;
+  left: 24px;
+  width: 16px;
+  height: 24px;
+  background: #18181b;
+  border-radius: 3px;
+  border: 1px solid #a1a1aa;
+}
+
+.stylus-needle {
+  position: absolute;
+  bottom: -4px;
+  left: 6px;
+  width: 3px;
+  height: 6px;
+  background: #00f0ff;
+  box-shadow: 0 0 6px #00f0ff;
+}
+
+/* ============================================================================
+ * 7. LIVE SPECTRUM VISUALIZER & KARAOKE LYRICS
+ * ============================================================================ */
+#live-spectrum-canvas {
+  width: 100%;
+  height: 220px;
+}
+
+#lyrics-scroll-container {
+  width: 100%;
+  height: 220px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  padding: 0 16px;
+}
+
+.lyric-line {
+  transition: all 0.3s ease;
+}
+
+.lyric-line.past {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.lyric-line.current {
+  font-size: 20px;
+  font-weight: 700;
+  color: #00f0ff;
+  text-shadow: 0 0 16px rgba(0, 240, 255, 0.7);
+  transform: scale(1.08);
+}
+
+.lyric-line.future {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ============================================================================
+ * 8. BOTTOM PLAYER PANEL (TRACK INFO, SEEK & CONTROLS)
+ * ============================================================================ */
+#bottom-player-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.track-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.track-meta {
+  flex: 1;
+  overflow: hidden;
+  padding-right: 14px;
+}
+
+.track-title {
+  font-size: 21px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.2px;
+}
+
+.track-artist {
+  font-size: 13.5px;
+  color: var(--text-dim);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-favorite {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-favorite.active {
+  color: var(--accent-pink);
+  filter: drop-shadow(0 0 10px rgba(255, 42, 133, 0.8));
+  transform: scale(1.1);
+}
+
+/* ============================================================================
+ * 9. CYBER WAVE SEEK BAR
+ * ============================================================================ */
+#seek-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+#seek-bar-track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  overflow: visible;
+}
+
+#seek-bar-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #00f0ff, #9d4edd);
+  border-radius: 999px;
+  box-shadow: 0 0 10px var(--primary-glow);
+}
+
+#seek-thumb {
+  position: absolute;
+  top: 50%;
+  left: 0%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 10px #00f0ff, 0 2px 6px rgba(0, 0, 0, 0.6);
+  transform: translate(-50%, -50%);
+  transition: transform 0.1s ease;
+}
+
+#seek-container:active #seek-thumb {
+  transform: translate(-50%, -50%) scale(1.35);
+}
+
+.time-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+/* ============================================================================
+ * 10. TRANSPORT CONTROLS & GIANT GLOWING PLAY/PAUSE ORB
+ * ============================================================================ */
+.transport-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+}
+
+.control-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.control-btn:active {
+  transform: scale(0.86);
+  color: #ffffff;
+}
+
+.control-btn.active {
+  color: var(--primary);
+  filter: drop-shadow(0 0 8px var(--primary));
+}
+
+.badge-dot {
+  display: none;
+  position: absolute;
+  bottom: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+.control-btn.active .badge-dot {
+  display: block;
+}
+
+/* Giant Floating Glowing Play/Pause Orb */
+.play-pause-orb {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #00f0ff, #0066ff);
+  border: none;
+  color: #050508;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow:
+    0 10px 28px rgba(0, 102, 255, 0.55),
+    0 0 24px var(--primary-glow);
+  transition: transform 0.18s ease, box-shadow 0.22s ease;
+}
+
+.play-pause-orb:active {
+  transform: scale(0.92);
+}
+
+.orb-ripple {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0, 240, 255, 0.45);
+  animation: orbPulse 2.4s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes orbPulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+.hidden {
   display: none !important;
 }
 
-.acc-banner-icon {
-  font-size: 20px;
-  filter: drop-shadow(0 0 8px #00f0ff);
-  flex-shrink: 0;
-}
-
-.acc-banner-body {
-  flex: 1;
-  text-align: left;
-}
-
-.acc-banner-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: #00f0ff;
-  letter-spacing: 0.2px;
-  margin-bottom: 2px;
-}
-
-.acc-banner-sub {
-  font-size: 11px;
-  line-height: 1.3;
-  color: rgba(226, 232, 240, 0.85);
-}
-
-.acc-banner-btn {
-  padding: 8px 14px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #00f0ff, #0077ff);
-  border: none;
-  color: #000000;
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  cursor: pointer;
-  flex-shrink: 0;
-  box-shadow: 0 0 12px rgba(0, 240, 255, 0.5);
-  transition: transform 0.15s ease, filter 0.15s ease;
-}
-
-.acc-banner-btn:active {
-  transform: scale(0.95);
-  filter: brightness(1.2);
-}
-
-@keyframes bannerSlideUp {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 /* ============================================================================
- * 4. BOXLESS FLOATING NEON-WHITE LIVE SPEECH WORDS / MINIMAL STATUS HINT
+ * 11. BOTTOM SHEET DRAWERS (LIBRARY, EQUALIZER, TIMER)
  * ============================================================================ */
-#live-speech-stream {
-  max-width: 420px;
-  text-align: center;
-  margin-bottom: 18px;
-  padding: 0 12px;
-  pointer-events: none;
-  min-height: 0;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 6px;
-}
-
-.status-hint {
-  font-size: 14.5px;
-  font-weight: 500;
-  color: rgba(224, 242, 254, 0.9);
-  letter-spacing: 0.3px;
-  text-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 15px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(56, 189, 248, 0.22);
-  pointer-events: auto;
-  cursor: pointer;
-  transition: opacity 0.25s ease, transform 0.25s ease;
-  animation: hintFadeIn 0.3s ease forwards;
-}
-
-.status-hint::before {
-  content: '';
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #38bdf8;
-  box-shadow: 0 0 8px #38bdf8;
-  animation: pulseDot 1.4s infinite ease-in-out alternate;
-}
-
-.status-hint.warning {
-  border-color: rgba(245, 158, 11, 0.45);
-  color: #fef3c7;
-}
-
-.status-hint.warning::before {
-  background: #f59e0b;
-  box-shadow: 0 0 8px #f59e0b;
-}
-
-@keyframes pulseDot {
-  from {
-    opacity: 0.35;
-    transform: scale(0.85);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1.25);
-  }
-}
-
-@keyframes hintFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.speech-word {
-  display: inline-block;
-  font-size: 21px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
-  line-height: 1.35;
-  color: #ffffff;
-  text-shadow:
-    0 0 14px rgba(0, 240, 255, 0.78),
-    0 2px 10px rgba(0, 0, 0, 0.85);
-  animation: wordBlurFadeIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-@keyframes wordBlurFadeIn {
-  0% {
-    opacity: 0;
-    filter: blur(8px);
-    transform: translateY(10px) scale(0.94);
-  }
-  100% {
-    opacity: 1;
-    filter: blur(0px);
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* ============================================================================
- * 5. MINIMALIST DARK GLASSMORPHISM CAPSULE (ONLY EXPANDS WHEN AI RESPONDS!)
- * ============================================================================ */
-#ai-response-capsule {
-  width: 100%;
-  max-width: 440px;
-  background: rgba(14, 18, 26, 0.86);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  border: 1px solid rgba(56, 189, 248, 0.28);
-  border-radius: 26px;
-  box-shadow:
-    0 18px 46px rgba(0, 0, 0, 0.62),
-    0 0 28px rgba(0, 212, 255, 0.18);
-  padding: 0 20px;
-  margin-bottom: 0;
-  max-height: 0;
-  opacity: 0;
-  overflow: hidden;
-  transform: translateY(18px) scale(0.92);
-  pointer-events: none;
-  transition:
-    max-height 0.46s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.36s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.46s cubic-bezier(0.22, 1, 0.36, 1),
-    padding 0.36s cubic-bezier(0.22, 1, 0.36, 1),
-    margin-bottom 0.36s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-#ai-response-capsule.expanded {
-  max-height: 240px;
-  opacity: 1;
-  padding: 16px 20px;
-  margin-bottom: 16px;
-  transform: translateY(0) scale(1);
-  pointer-events: auto;
-}
-
-#ai-response-text {
-  font-size: 16.5px;
-  font-weight: 500;
-  line-height: 1.44;
-  color: #f1f5f9;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
-  word-break: break-word;
-}
-
-/* ============================================================================
- * 6. 3D LIQUID PLASMA SPHERE (Spring Slide-Up cubic-bezier(0.22, 1, 0.36, 1))
- * ============================================================================ */
-#orb-spring-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: auto;
-  transform: translateY(130px) scale(0.65);
-  opacity: 0;
-  animation: orbSpringSlideUp 0.68s cubic-bezier(0.22, 1, 0.36, 1) 0.05s forwards;
-}
-
-@keyframes orbSpringSlideUp {
-  0% {
-    transform: translateY(130px) scale(0.65);
-    opacity: 0;
-  }
-  100% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-}
-
-#plasma-orb-btn {
-  width: 84px;
-  height: 84px;
-  border-radius: 50%;
-  border: none;
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  filter: drop-shadow(0 10px 28px rgba(0, 174, 255, 0.62));
-  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-#plasma-orb-btn:active {
-  transform: scale(0.9);
-}
-
-#plasma-orb-canvas {
-  width: 84px;
-  height: 84px;
-  display: block;
-}
-
-/* ============================================================================
- * 7. SETTINGS & PERMISSIONS BOTTOM-SHEET
- * ============================================================================ */
-#settings-sheet-backdrop {
+.modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 50;
-  background: rgba(0, 0, 0, 0.48);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  display: none;
-  align-items: flex-end;
-  justify-content: center;
-}
-
-#settings-sheet-backdrop.open {
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
   display: flex;
+  align-items: flex-end;
 }
 
-#settings-bottom-sheet {
+.modal-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.bottom-sheet {
   width: 100%;
-  max-width: 500px;
-  max-height: 84vh;
-  overflow-y: auto;
-  background: rgba(18, 21, 28, 0.96);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  border-top-left-radius: 28px;
-  border-top-right-radius: 28px;
-  border: 1px solid rgba(56, 189, 248, 0.2);
+  max-height: 82vh;
+  background: rgba(14, 16, 25, 0.94);
+  border-top: 1px solid var(--border-glass);
+  border-radius: 28px 28px 0 0;
   padding: 14px 20px calc(24px + env(safe-area-inset-bottom, 0px)) 20px;
-  color: #f8fafc;
-  box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.72);
-  animation: sheetSpringUp 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.8);
+  transform: translateY(100%);
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@keyframes sheetSpringUp {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: translateY(0);
-  }
+.modal-backdrop.open .bottom-sheet {
+  transform: translateY(0);
 }
 
 .sheet-handle {
-  width: 42px;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.25);
+  width: 44px;
+  height: 4.5px;
+  background: rgba(255, 255, 255, 0.22);
   border-radius: 999px;
-  margin: 0 auto 14px auto;
+  align-self: center;
+  margin-bottom: 14px;
 }
 
-.sheet-header {
+.sheet-top-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .sheet-title {
-  font-size: 16.5px;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
 }
 
-.sheet-close {
+.action-pill-btn {
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(157, 78, 221, 0.25));
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  color: #00f0ff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.icon-btn-sm {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #ffffff;
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  font-size: 15px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
 }
 
-.sheet-section {
-  background: rgba(255, 255, 255, 0.045);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  padding: 14px 16px;
+/* Search Box */
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-glass);
+  padding: 10px 14px;
+  border-radius: 16px;
   margin-bottom: 14px;
 }
 
-.sheet-section-title {
-  font-size: 11.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: #38bdf8;
-  margin-bottom: 10px;
-}
-
-.field-label {
-  display: block;
-  font-size: 12.5px;
-  color: rgba(255, 255, 255, 0.72);
-  margin-bottom: 5px;
-  margin-top: 8px;
-}
-
-.sheet-input {
-  width: 100%;
-  background: rgba(0, 0, 0, 0.38);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 12px;
-  padding: 10px 12px;
-  color: #ffffff;
-  font-size: 13.5px;
-  outline: none;
-}
-
-.sheet-input:focus {
-  border-color: #38bdf8;
-}
-
-.sheet-save-btn {
-  margin-top: 12px;
-  width: 100%;
-  padding: 11px;
-  border-radius: 14px;
+.search-box input {
+  background: transparent;
   border: none;
-  background: linear-gradient(135deg, #0284c7, #38bdf8);
-  color: #041019;
-  font-weight: 700;
+  outline: none;
+  color: #ffffff;
   font-size: 14px;
-  cursor: pointer;
+  width: 100%;
 }
 
-.perm-row {
+/* Track List Container */
+.track-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 52vh;
+  padding-right: 4px;
+}
+
+.track-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 9px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: background 0.18s ease;
 }
 
-.perm-row:last-child {
-  border-bottom: none;
+.track-item:active {
+  background: rgba(255, 255, 255, 0.08);
 }
 
-.perm-info {
-  flex: 1;
-  padding-right: 10px;
+.track-item.active {
+  background: rgba(0, 240, 255, 0.12);
+  border-color: rgba(0, 240, 255, 0.35);
 }
 
-.perm-name {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: #f1f5f9;
-}
-
-.perm-desc {
-  font-size: 11.5px;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.perm-action-btn {
-  padding: 7px 13px;
+.track-thumb {
+  width: 44px;
+  height: 44px;
   border-radius: 12px;
-  border: 1px solid rgba(56, 189, 248, 0.4);
-  background: rgba(2, 132, 199, 0.25);
-  color: #bae6fd;
-  font-size: 12.5px;
+  object-fit: cover;
+  background: #1e1e2d;
+  flex-shrink: 0;
+}
+
+.track-info-col {
+  flex: 1;
+  overflow: hidden;
+}
+
+.track-item-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-item.active .track-item-title {
+  color: #00f0ff;
+}
+
+.track-item-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-dur {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+/* ============================================================================
+ * 12. EQUALIZER CONTROLS & PRESETS
+ * ============================================================================ */
+.presets-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+}
+
+.preset-pill {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-glass);
+  color: var(--text-dim);
+  font-size: 12px;
   font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
   cursor: pointer;
   white-space: nowrap;
 }
 
-.perm-action-btn.granted {
-  background: rgba(16, 185, 129, 0.2);
-  border-color: rgba(16, 185, 129, 0.45);
-  color: #6ee7b7;
+.preset-pill.active {
+  background: #00f0ff;
+  color: #000000;
+  font-weight: 700;
+}
+
+.eq-sliders-grid {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  height: 160px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 20px;
+  padding: 16px 10px;
+  margin-bottom: 16px;
+}
+
+.eq-band-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  height: 100%;
+}
+
+.vertical-slider {
+  writing-mode: bt-lr;
+  -webkit-appearance: slider-vertical;
+  width: 14px;
+  height: 100px;
+  accent-color: #00f0ff;
+}
+
+.eq-freq-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.bass-boost-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-glass);
+  padding: 14px 16px;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bass-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: #ff2a85;
+  letter-spacing: 0.5px;
+}
+
+.bass-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.horizontal-slider {
+  width: 100%;
+  accent-color: #ff2a85;
+}
+
+/* ============================================================================
+ * 13. SLEEP TIMER MODAL
+ * ============================================================================ */
+.timer-subtext {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.4;
+  margin-bottom: 18px;
+}
+
+.timer-options-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.timer-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-glass);
+  color: var(--text-main);
+  padding: 14px;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.timer-btn:active {
+  transform: scale(0.96);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.timer-btn.cancel {
+  grid-column: span 2;
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+.timer-active-badge {
+  text-align: center;
+  padding: 10px;
+  background: rgba(0, 240, 255, 0.12);
+  border-radius: 12px;
+  color: #00f0ff;
+  font-size: 13px;
+  font-weight: 600;
 }

@@ -3,120 +3,307 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>NOVA</title>
+  <title>AURA Music</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body data-speaking-active="false">
+<body data-mode="vinyl" data-playing="false" data-ambient="true">
 
-  <!-- 1. Top Transparent Area (Reveals Launcher & Apps Behind; Tap to Dismiss) -->
-  <div id="transparent-dismiss-zone" aria-label="Dismiss Overlay"></div>
+  <!-- Dynamic Ambient Mesh Glow Canvas (Color Morphs with Album Art) -->
+  <canvas id="ambient-mesh-canvas"></canvas>
+  <div id="ambient-overlay-sheen"></div>
 
-  <!-- 2. Gemini Live Sleek Cyber Edge Rim + Corner Accents -->
-  <div id="edge-glow-container">
-    <div class="neon-edge-border"></div>
-    <div class="cyber-corner corner-tl"></div>
-    <div class="cyber-corner corner-tr"></div>
-    <div class="cyber-corner corner-bl"></div>
-    <div class="cyber-corner corner-br"></div>
-    <canvas id="bottom-mist-canvas"></canvas>
-  </div>
+  <!-- Main App Shell -->
+  <div id="aura-app">
 
-  <!-- 3. Bottom Compact Stage: Status Hint / Live Words + AI Glass Capsule + Spring 3D Plasma Sphere -->
-  <div id="bottom-orb-stage">
-
-    <!-- Boxless Neon-White Live Speech Words / Minimalist Status Hint -->
-    <div id="live-speech-stream">
-      <div id="status-hint" class="status-hint">Eshitmoqdaman...</div>
-    </div>
-
-    <!-- Minimalist Dark Glassmorphism Capsule (Expands ONLY when AI Replies) -->
-    <div id="ai-response-capsule">
-      <div id="ai-response-text"></div>
-    </div>
-
-    <!-- Proactive Accessibility Permission Alert Banner (Shown if Accessibility is not yet granted) -->
-    <div id="acc-perm-banner" class="acc-perm-banner hidden">
-      <div class="acc-banner-icon">⚡</div>
-      <div class="acc-banner-body">
-        <div class="acc-banner-title">Avtomatizatsiya (Accessibility) ruxsati kerak</div>
-        <div class="acc-banner-sub">Telegram Plus va ilovalarda odamga avtomatik kirish uchun NOVA xizmatini yoqing.</div>
-      </div>
-      <button id="btn-grant-accessibility" class="acc-banner-btn">Yoqish</button>
-    </div>
-
-    <!-- Spring Slide-Up 3D Liquid Plasma Sphere (Tap: Listen | Long-Press: Settings) -->
-    <div id="orb-spring-wrapper">
-      <button id="plasma-orb-btn" aria-label="Nova Plasma Orb">
-        <canvas id="plasma-orb-canvas" width="168" height="168"></canvas>
+    <!-- Top Navigation Header -->
+    <header id="top-header">
+      <button id="btn-open-library" class="icon-btn" aria-label="Kutubxona">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="15" y2="12"></line>
+          <line x1="3" y1="18" x2="18" y2="18"></line>
+        </svg>
+        <span id="library-count-pill" class="pill-badge">4 trek</span>
       </button>
-    </div>
+
+      <div class="brand-title">
+        <div class="brand-name">AURA</div>
+        <div class="brand-sub">AMBIENT AUDIO</div>
+      </div>
+
+      <div class="top-actions">
+        <button id="btn-toggle-ambient-mode" class="icon-btn" title="Qulf ekrani / Ambient rejimi">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </button>
+        <button id="btn-open-eq" class="icon-btn" title="Ekvalayzer">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="4" y1="21" x2="4" y2="14"></line>
+            <line x1="4" y1="10" x2="4" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12" y2="3"></line>
+            <line x1="20" y1="21" x2="20" y2="16"></line>
+            <line x1="20" y1="12" x2="20" y2="3"></line>
+            <circle cx="4" cy="12" r="2"></circle>
+            <circle cx="12" cy="10" r="2"></circle>
+            <circle cx="20" cy="14" r="2"></circle>
+          </svg>
+        </button>
+        <button id="btn-open-timer" class="icon-btn" title="Uyqu taymeri">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Center Stage Switcher Tabs (Vinyl | Visualizer | Lyrics) -->
+    <nav id="view-mode-tabs">
+      <button class="mode-tab active" data-target="vinyl">Vinil</button>
+      <button class="mode-tab" data-target="visualizer">Visualizer</button>
+      <button class="mode-tab" data-target="lyrics">Lirikalar</button>
+    </nav>
+
+    <!-- Dynamic Center Stage Area -->
+    <main id="center-stage">
+
+      <!-- MODE 1: Interactive 3D Turntable & Spinning Vinyl Record with Moving Needle -->
+      <section id="stage-vinyl" class="stage-section active">
+        <div id="turntable-container">
+          <!-- Turntable Platter Base -->
+          <div class="turntable-platter">
+            <!-- Vinyl Record Disc -->
+            <div id="vinyl-disc" class="vinyl-disc">
+              <div class="vinyl-groove groove-outer"></div>
+              <div class="vinyl-groove groove-mid"></div>
+              <div class="vinyl-groove groove-inner"></div>
+              <!-- Center Album Sticker -->
+              <div class="vinyl-label-wrapper">
+                <img id="vinyl-album-img" src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&q=80" alt="Album Cover" />
+                <div class="vinyl-spindle-hole"></div>
+              </div>
+              <div class="vinyl-sheen-highlight"></div>
+            </div>
+          </div>
+
+          <!-- Physical Tonearm / Needle Arm (Swings onto Vinyl on play) -->
+          <div id="tonearm" class="tonearm">
+            <div class="tonearm-pivot"></div>
+            <div class="tonearm-rod"></div>
+            <div class="tonearm-head">
+              <div class="stylus-needle"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MODE 2: 60/120 FPS Additive-Blended Neon Spectrum Waveform Visualizer -->
+      <section id="stage-visualizer" class="stage-section">
+        <canvas id="live-spectrum-canvas"></canvas>
+      </section>
+
+      <!-- MODE 3: Synchronized Frosted Glass Karaoke Lyrics -->
+      <section id="stage-lyrics" class="stage-section">
+        <div id="lyrics-scroll-container">
+          <div class="lyric-line past">♪ Musiqa yangramoqda...</div>
+          <div class="lyric-line current" id="lyric-current">AURA bilan musiqani his eting</div>
+          <div class="lyric-line future">Chuqur bass va ambient tovushlar</div>
+          <div class="lyric-line future">Qulf ekranida ham betakror vizual zavq</div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Audio Control Bar & Track Info -->
+    <footer id="bottom-player-panel">
+
+      <!-- Track Information & Like Action -->
+      <div class="track-header-row">
+        <div class="track-meta">
+          <h1 id="track-title" class="track-title">Cyber Pulse (Synthwave)</h1>
+          <p id="track-artist" class="track-artist">AURA Originals • Neon Drift</p>
+        </div>
+        <button id="btn-favorite" class="btn-favorite" aria-label="Sevimlilarga qo'shish">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Fluid Neon Wave Seek Bar -->
+      <div id="seek-container">
+        <div id="seek-bar-track">
+          <div id="seek-bar-fill"></div>
+          <div id="seek-bar-glow"></div>
+          <div id="seek-thumb"></div>
+        </div>
+        <div class="time-row">
+          <span id="time-current">0:00</span>
+          <span id="time-duration">3:06</span>
+        </div>
+      </div>
+
+      <!-- Main Controls Row (Shuffle, Prev, Giant Play/Pause Orb, Next, Repeat) -->
+      <div class="transport-row">
+        <button id="btn-shuffle" class="control-btn" title="Aralash">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="16 3 21 3 21 8"></polyline>
+            <line x1="4" y1="20" x2="21" y2="3"></line>
+            <polyline points="21 16 21 21 16 21"></polyline>
+            <line x1="15" y1="15" x2="21" y2="21"></line>
+            <line x1="4" y1="4" x2="9" y2="9"></line>
+          </svg>
+        </button>
+
+        <button id="btn-prev" class="control-btn" title="Oldingi trek">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="19 20 9 12 19 4 19 20"></polygon>
+            <line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="3" stroke-linecap="round"></line>
+          </svg>
+        </button>
+
+        <!-- Floating Glowing Play/Pause Orb -->
+        <button id="btn-play-pause" class="play-pause-orb" aria-label="Ijro / Pauza">
+          <div class="orb-ripple"></div>
+          <svg id="icon-play" width="34" height="34" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="6 3 20 12 6 21 6 3"></polygon>
+          </svg>
+          <svg id="icon-pause" class="hidden" width="34" height="34" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="4" width="4" height="16" rx="1.5"></rect>
+            <rect x="14" y="4" width="4" height="16" rx="1.5"></rect>
+          </svg>
+        </button>
+
+        <button id="btn-next" class="control-btn" title="Keyingi trek">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 4 15 12 5 20 5 4"></polygon>
+            <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="3" stroke-linecap="round"></line>
+          </svg>
+        </button>
+
+        <button id="btn-repeat" class="control-btn" title="Takrorlash">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="17 1 21 5 17 9"></polyline>
+            <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+            <polyline points="7 23 3 19 7 15"></polyline>
+            <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+          </svg>
+          <span id="repeat-badge" class="badge-dot"></span>
+        </button>
+      </div>
+
+    </footer>
 
   </div>
 
-  <!-- 4. Settings & Permissions Bottom-Sheet (Opened by holding Orb for 0.85s) -->
-  <div id="settings-sheet-backdrop">
-    <div id="settings-bottom-sheet">
+  <!-- =========================================================================
+       DRAWER 1: Track Library & Device Audio Scanner Bottom-Sheet
+       ========================================================================= -->
+  <div id="library-drawer-backdrop" class="modal-backdrop">
+    <div id="library-drawer" class="bottom-sheet">
       <div class="sheet-handle"></div>
-      <div class="sheet-header">
-        <div class="sheet-title">⚙️ NOVA Sozlamalar & Ruxsatlar</div>
-        <button id="sheet-close-btn" class="sheet-close">✕</button>
+      <div class="sheet-top-bar">
+        <h2 class="sheet-title">🎵 Musiqa Kutubxonasi</h2>
+        <button id="btn-scan-device" class="action-pill-btn">
+          <span>⚡ Xotirani skanerlash</span>
+        </button>
       </div>
 
-      <!-- Gemini API Key & Groq API Key -->
-      <div class="sheet-section">
-        <div class="sheet-section-title">1. AI API Kalitlari (Haqiqiy Fetch)</div>
-        <label class="field-label" for="input-gemini-key">Gemini API Key (generativelanguage.googleapis.com)</label>
-        <input id="input-gemini-key" class="sheet-input" type="password" placeholder="AIzaSy... (ixtiyoriy)" autocomplete="off" />
-
-        <label class="field-label" for="input-groq-key">Groq API Key (api.groq.com — Llama 3.3 70B)</label>
-        <input id="input-groq-key" class="sheet-input" type="password" placeholder="gsk_... (ixtiyoriy)" autocomplete="off" />
-
-        <button id="btn-save-api-keys" class="sheet-save-btn">API Kalitlarni Saqlash</button>
+      <!-- Search Input -->
+      <div class="search-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input id="input-search-tracks" type="text" placeholder="Qo'shiq yoki ijrochini qidirish..." />
       </div>
 
-      <!-- Real Android Permissions via NovaBridge -->
-      <div class="sheet-section">
-        <div class="sheet-section-title">2. Tizim Ruxsatlari (Real Android Settings)</div>
+      <!-- Track List Container -->
+      <div id="track-list" class="track-list">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
 
-        <div class="perm-row">
-          <div class="perm-info">
-            <div class="perm-name">🎤 Microphone (Native SpeechRecognizer)</div>
-            <div class="perm-desc">100% Native Android ovoz tanish va jonli to'lqin</div>
-          </div>
-          <button class="perm-action-btn" data-perm="microphone" id="perm-btn-microphone">Yoqish</button>
-        </div>
+  <!-- =========================================================================
+       DRAWER 2: 5-Band Equalizer & Bass Boost Modal
+       ========================================================================= -->
+  <div id="eq-modal-backdrop" class="modal-backdrop">
+    <div id="eq-sheet" class="bottom-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-top-bar">
+        <h2 class="sheet-title">🎛️ Ovoz & Ekvalayzer</h2>
+        <button id="btn-close-eq" class="icon-btn-sm">✕</button>
+      </div>
 
-        <div class="perm-row">
-          <div class="perm-info">
-            <div class="perm-name">🤖 Accessibility Service</div>
-            <div class="perm-desc">Telegram Plus avto-yozish va qulfni ochish</div>
-          </div>
-          <button class="perm-action-btn" data-perm="accessibility" id="perm-btn-accessibility">Sozlash</button>
-        </div>
+      <!-- Equalizer Presets -->
+      <div class="presets-row">
+        <button class="preset-pill active" data-preset="bass">Deep Bass</button>
+        <button class="preset-pill" data-preset="synth">Synthwave</button>
+        <button class="preset-pill" data-preset="vocal">Vocal Pro</button>
+        <button class="preset-pill" data-preset="rock">Rock</button>
+        <button class="preset-pill" data-preset="flat">Flat</button>
+      </div>
 
-        <div class="perm-row">
-          <div class="perm-info">
-            <div class="perm-name">🪟 Overlay (Ilovalar ustida ko'rinish)</div>
-            <div class="perm-desc">Boshqa ilovalar ustida shaffof chiqish</div>
-          </div>
-          <button class="perm-action-btn" data-perm="overlay" id="perm-btn-overlay">Sozlash</button>
+      <!-- 5-Band Sliders -->
+      <div class="eq-sliders-grid">
+        <div class="eq-band-col">
+          <input type="range" class="vertical-slider" data-band="0" min="-1000" max="1000" value="450" />
+          <span class="eq-freq-label">60Hz</span>
         </div>
+        <div class="eq-band-col">
+          <input type="range" class="vertical-slider" data-band="1" min="-1000" max="1000" value="250" />
+          <span class="eq-freq-label">230Hz</span>
+        </div>
+        <div class="eq-band-col">
+          <input type="range" class="vertical-slider" data-band="2" min="-1000" max="1000" value="0" />
+          <span class="eq-freq-label">910Hz</span>
+        </div>
+        <div class="eq-band-col">
+          <input type="range" class="vertical-slider" data-band="3" min="-1000" max="1000" value="350" />
+          <span class="eq-freq-label">3.6kHz</span>
+        </div>
+        <div class="eq-band-col">
+          <input type="range" class="vertical-slider" data-band="4" min="-1000" max="1000" value="500" />
+          <span class="eq-freq-label">14kHz</span>
+        </div>
+      </div>
 
-        <div class="perm-row">
-          <div class="perm-info">
-            <div class="perm-name">📞 Phone Calls (Qo'ng'iroqlar & 6-Gudok)</div>
-            <div class="perm-desc">6-gudok kotib tizimi uchun</div>
-          </div>
-          <button class="perm-action-btn" data-perm="phoneCalls" id="perm-btn-phoneCalls">Yoqish</button>
+      <!-- Bass Boost Rotary / Slider -->
+      <div class="bass-boost-card">
+        <div class="bass-boost-info">
+          <div class="bass-label">🔥 3D BASS BOOST</div>
+          <div id="bass-strength-value" class="bass-sub">80% quvvat</div>
         </div>
+        <input id="slider-bass-boost" type="range" min="0" max="1000" value="800" class="horizontal-slider" />
+      </div>
+    </div>
+  </div>
 
-        <div class="perm-row">
-          <div class="perm-info">
-            <div class="perm-name">📊 Usage Stats (Instagram vaqti)</div>
-            <div class="perm-desc">Ilovalarda o'tkazilgan vaqtni hisoblash</div>
-          </div>
-          <button class="perm-action-btn" data-perm="usageStats" id="perm-btn-usageStats">Sozlash</button>
-        </div>
+  <!-- =========================================================================
+       DRAWER 3: Sleep Timer (Uyqu Taymeri) Modal
+       ========================================================================= -->
+  <div id="timer-modal-backdrop" class="modal-backdrop">
+    <div id="timer-sheet" class="bottom-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-top-bar">
+        <h2 class="sheet-title">🌙 Uyqu Taymeri (Sleep Timer)</h2>
+        <button id="btn-close-timer" class="icon-btn-sm">✕</button>
+      </div>
+      <p class="timer-subtext">Belgilangan vaqt tugagach musiqa sekin-asta pasayib (fade-out) to'xtaydi.</p>
+
+      <div class="timer-options-grid">
+        <button class="timer-btn" data-minutes="15">15 daqiqa</button>
+        <button class="timer-btn" data-minutes="30">30 daqiqa</button>
+        <button class="timer-btn" data-minutes="45">45 daqiqa</button>
+        <button class="timer-btn" data-minutes="60">1 soat</button>
+        <button class="timer-btn cancel" data-minutes="0">O'chirish</button>
+      </div>
+
+      <div id="timer-active-badge" class="timer-active-badge hidden">
+        <span>Faol taymer: <strong id="timer-countdown-text">30:00</strong></span>
       </div>
     </div>
   </div>

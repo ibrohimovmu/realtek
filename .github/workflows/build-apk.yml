@@ -1,4 +1,4 @@
-name: Build Nova-Jarvis APK
+name: Build AURA Music APK
 
 on:
   push:
@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: 20
 
-      - name: Sync NOVA Translucent Overlay Assets to Android Bundle
+      - name: Sync AURA Web Assets to Android Bundle
         run: |
           npm run sync
 
@@ -38,40 +38,47 @@ jobs:
         with:
           gradle-version: 8.7
 
-      - name: Build Translucent Nova Overlay APK (API 26 - API 35)
+      - name: Build AURA Music APK (API 26 - API 35)
         working-directory: android
         run: |
           gradle assembleDebug --stacktrace
 
       - name: Package APK Files
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk Nova-Overlay-v3.4.apk
-          cp android/app/build/outputs/apk/debug/app-debug.apk Nova-Jarvis.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk Aura-Music.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk Aura-v1.0.apk
 
-      - name: Upload Nova-Overlay-v3.4.apk Artifact
+      - name: Upload Aura-Music.apk Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Nova-Overlay-v3.4-APK
+          name: Aura-Music-APK
           path: |
-            Nova-Overlay-v3.4.apk
-            Nova-Jarvis.apk
+            Aura-Music.apk
+            Aura-v1.0.apk
           retention-days: 30
 
-      - name: Publish v3.4.0 to GitHub Releases
+      - name: Publish v1.0.0 to GitHub Releases
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: nova-overlay-v3.4.0
-          name: "NOVA v3.4.0 — One-Tap Proactive Accessibility Prompt & Auto-Settings Opener"
+          tag_name: aura-v1.0.0
+          name: "AURA v1.0.0 — Next-Gen Ambient & 3D Vinyl Music Player"
           make_latest: true
           body: |
-            ## 🌌 NOVA v3.4.0 (`Nova-Overlay-v3.4.apk` / `Nova-Jarvis.apk`)
+            ## 🎵 AURA v1.0.0 (`Aura-Music.apk` / `Aura-v1.0.apk`)
 
-            - ⚡ **Proactive Accessibility Permission Prompts:** If Accessibility is not enabled, NOVA now displays an immediate, beautiful one-tap banner above the Orb to directly open Android's Accessibility Settings page.
-            - 🚀 **Zero-Confusion Auto-Navigator:** If you say *"plusga kir Jamshidga yoz"* before granting Accessibility, NOVA speaks aloud and opens the settings directly: *"Bro, Telegramda odamga avtomatik kirishim uchun Maxsus imkoniyatlar (Accessibility) ruxsatini yoqishing kerak, hozir ochyapman!"*.
-            - 🔄 **Auto-Resume & Detection:** As soon as you toggle on NOVA Accessibility and return to the app, the banner dismisses automatically with full automation unlocked.
+            The next-generation Ambient & 3D Vinyl Music Player for Android (API 26 to API 35):
+
+            ### 🌟 Key Highlights:
+            - 💿 **Interactive 3D Vinyl Turntable:** Photorealistic rotating vinyl with moving mechanical tonearm (needle arm) that automatically drops onto the vinyl on play and lifts off on pause. Plus interactive DJ scratch touch scrub!
+            - 🎨 **Dynamic Ambient Mesh Glow:** Background colors morph smoothly matching the album artwork.
+            - 📊 **60/120 FPS Live Spectrum Visualizer:** Additive-blended neon waveform reacting in real-time to audio amplitude and bass frequencies.
+            - 🔒 **Dual Lockscreen Experience:** Native Android 11-15 lock screen notification with media controls + optional AURA Ambient Lockscreen mode (`SHOW_WHEN_LOCKED`).
+            - 🎛️ **5-Band Hardware Equalizer & 3D Bass Boost:** Custom presets for deep bass, rock, synthwave, and vocals.
+            - 📁 **Automated Local Storage Scanner:** Scans and indexes all MP3, FLAC, M4A, WAV audio files on device with instant search.
+            - 🌙 **Sleep Timer with Smooth Fade-Out:** 15, 30, 45, 60 minutes with smooth volume decline.
           files: |
-            Nova-Overlay-v3.4.apk
-            Nova-Jarvis.apk
+            Aura-Music.apk
+            Aura-v1.0.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

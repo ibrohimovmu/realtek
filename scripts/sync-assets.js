@@ -18,12 +18,10 @@ function copyRecursiveSync(src, dest) {
 }
 
 const srcDir = path.resolve(__dirname, '../www');
-const targetDir = path.resolve(__dirname, '../android/app/src/main/assets/public');
+const targetPublic = path.resolve(__dirname, '../android/app/src/main/assets/public');
+const targetRoot = path.resolve(__dirname, '../android/app/src/main/assets');
 
-console.log(`Syncing NOVA Zero-UI bundle from ${srcDir} to ${targetDir}...`);
-if (fs.existsSync(targetDir)) {
-  fs.rmSync(targetDir, { recursive: true, force: true });
-}
-fs.mkdirSync(targetDir, { recursive: true });
-copyRecursiveSync(srcDir, targetDir);
-console.log('✓ Successfully synced NOVA Zero-UI assets into Android APK bundle!');
+console.log(`Syncing AURA bundle from ${srcDir} to Android assets...`);
+copyRecursiveSync(srcDir, targetPublic);
+copyRecursiveSync(srcDir, targetRoot);
+console.log('✓ Successfully synced AURA assets into Android APK bundle!');

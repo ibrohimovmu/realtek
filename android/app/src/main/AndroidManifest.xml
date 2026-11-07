@@ -2,52 +2,30 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Network & Connectivity -->
+    <!-- Audio Playback & Media Storage Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.VIBRATE" />
-
-    <!-- Audio, Microphone & Hands-Free Voice Biometrics -->
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
-    <!-- 6-Gudok Call Secretary & Relationship Matrix Telephony -->
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <uses-permission android:name="android.permission.READ_CALL_LOG" />
-    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
-    <uses-permission android:name="android.permission.CALL_PHONE" />
-    <uses-permission android:name="android.permission.READ_CONTACTS" />
-    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
+    <!-- Storage permissions for scanning local MP3/audio files -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29"
+        tools:ignore="ScopedStorage" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 
-    <!-- Lock-Screen Wake, Overlay & Background Persistence (API 26 - 35) -->
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Background playback & media service permissions (Android 8 to 15) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Alarms, Prayer Times & Daily Plan Scheduler -->
-    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
-
-    <!-- Focus Guardian (Instagram 10-Min Blocker) & Package Inspection -->
-    <uses-permission
-        android:name="android.permission.PACKAGE_USAGE_STATS"
-        tools:ignore="ProtectedPermissions" />
-    <uses-permission
-        android:name="android.permission.QUERY_ALL_PACKAGES"
-        tools:ignore="QueryAllPackagesPermission" />
-    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
-
-    <!-- Hardware features optional for broad device compatibility -->
-    <uses-feature android:name="android.hardware.microphone" android:required="false" />
-    <uses-feature android:name="android.hardware.telephony" android:required="false" />
+    <!-- Lockscreen Ambient HUD & Wake Permissions -->
+    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
 
     <application
         android:allowBackup="true"
@@ -59,13 +37,12 @@
         android:hardwareAccelerated="true"
         android:theme="@style/AppTheme">
 
-        <!-- Main Translucent Compact Overlay Activity (Works over Launcher & Lock Screen) -->
+        <!-- Main Activity: 120 FPS Ambient Vinyl Player & Lock Screen HUD -->
         <activity
-            android:name=".MainActivity"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:name="com.aura.music.MainActivity"
+            android:theme="@style/AppTheme"
             android:exported="true"
-            android:launchMode="singleInstance"
-            android:excludeFromRecents="false"
+            android:launchMode="singleTop"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|uiMode"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
@@ -74,99 +51,23 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Open audio files directly from file managers, Telegram, WhatsApp -->
             <intent-filter>
-                <action android:name="android.intent.action.ASSIST" />
+                <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VOICE_COMMAND" />
-                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:mimeType="audio/*" />
             </intent-filter>
         </activity>
 
-        <!-- 24/7 Hands-Free Wake-Word & Focus Guardian Foreground Service -->
+        <!-- Background Media Service with MediaSession & Lockscreen Notification -->
         <service
-            android:name=".NovaVoiceForegroundService"
+            android:name="com.aura.music.AuraMusicService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="microphone|specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Autonomous hands-free AI assistant wake-word listener and Focus Guardian timer" />
-        </service>
-
-        <!-- 6-Gudok Call Secretary Service -->
-        <service
-            android:name=".NovaCallSecretaryService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="microphone|specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Autonomous 6-ring call secretary and live caller voice responder" />
-        </service>
-
-        <!-- Auto-Unlock, Telegram Plus UI Automation & Instagram 10-Min Focus Lock Service -->
-        <service
-            android:name=".NovaAccessibilityService"
-            android:label="NOVA Autonomous Control &amp; Focus Guardian"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/nova_accessibility" />
-        </service>
-
-        <!-- Telegram Plus & Messenger Notification Twin Auto-Reply Service -->
-        <service
-            android:name=".NovaNotificationService"
-            android:label="NOVA Digital Twin Notification Responder"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
-
-        <!-- Incoming Call 6-Ring Receiver & Boot Receiver -->
-        <receiver
-            android:name=".PhoneCallReceiver"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter android:priority="999">
-                <action android:name="android.intent.action.PHONE_STATE" />
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
+            android:foregroundServiceType="mediaPlayback" />
 
     </application>
-
-    <!-- Package Visibility Queries for Android 11 - 15 (Telegram Plus, Telegram, Instagram, WhatsApp) -->
-    <queries>
-        <package android:name="org.telegram.plus" />
-        <package android:name="org.telegram.messenger" />
-        <package android:name="org.telegram.messenger.web" />
-        <package android:name="org.thunderdog.challegram" />
-        <package android:name="uz.unnarsx.cherrygram" />
-        <package android:name="com.instagram.android" />
-        <package android:name="com.whatsapp" />
-        <intent>
-            <action android:name="android.intent.action.MAIN" />
-            <category android:name="android.intent.category.LAUNCHER" />
-        </intent>
-        <intent>
-            <action android:name="android.speech.RecognitionService" />
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.TTS_SERVICE" />
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="tg" />
-        </intent>
-    </queries>
 
 </manifest>
