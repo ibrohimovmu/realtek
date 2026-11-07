@@ -318,10 +318,68 @@ function closeTopicModal() {
 }
 
 // ============================================================================
-// 5. VIBE SAVER (1-VIDEO)
+// 5. VIBE SAVER & VIDEO SCRUBBING (1-VIDEO)
 // ============================================================================
+function toggleOnboardingMode(mode) {
+    const lensCanvas = document.getElementById('lens-canvas');
+    const videoBox = document.getElementById('onboarding-video-box');
+    const wabiVideo = document.getElementById('wabi-preview-video');
+    const btnLens = document.getElementById('btn-onboarding-lens');
+    const btnVideo = document.getElementById('btn-onboarding-video');
+
+    if (mode === 'video') {
+        if (lensCanvas) lensCanvas.style.display = 'none';
+        if (videoBox) videoBox.style.display = 'block';
+        if (wabiVideo) wabiVideo.play();
+        if (btnLens) btnLens.classList.remove('active');
+        if (btnVideo) btnVideo.classList.add('active');
+        document.getElementById('onboarding-buttons').classList.add('visible');
+    } else {
+        if (lensCanvas) lensCanvas.style.display = 'block';
+        if (videoBox) videoBox.style.display = 'none';
+        if (wabiVideo) wabiVideo.pause();
+        if (btnLens) btnLens.classList.add('active');
+        if (btnVideo) btnVideo.classList.remove('active');
+    }
+}
+
+function toggleVibeMode(mode) {
+    const videoContainer = document.getElementById('vibe-video-container');
+    const canvasContainer = document.getElementById('furry-container');
+    const btnVideo = document.getElementById('btn-vibe-video');
+    const btnCanvas = document.getElementById('btn-vibe-canvas');
+
+    if (mode === 'canvas') {
+        if (videoContainer) videoContainer.style.display = 'none';
+        if (canvasContainer) canvasContainer.style.display = 'flex';
+        if (btnVideo) btnVideo.classList.remove('active');
+        if (btnCanvas) btnCanvas.classList.add('active');
+        if (furryInstance) setTimeout(() => furryInstance.resize(), 50);
+    } else {
+        if (videoContainer) videoContainer.style.display = 'flex';
+        if (canvasContainer) canvasContainer.style.display = 'none';
+        if (btnVideo) btnVideo.classList.add('active');
+        if (btnCanvas) btnCanvas.classList.remove('active');
+    }
+}
+
+function setupVideoScrubbing() {
+    const slider = document.getElementById('vibe-slider');
+    const scrubVideo = document.getElementById('vibe-scrub-video');
+    if (slider && scrubVideo) {
+        slider.addEventListener('input', (e) => {
+            const frac = parseFloat(e.target.value) / 100;
+            if (scrubVideo.duration) {
+                scrubVideo.currentTime = frac * scrubVideo.duration;
+            }
+        });
+    }
+}
+document.addEventListener('DOMContentLoaded', setupVideoScrubbing);
+
 function saveVibeScore() {
-    const val = Math.round(furryInstance.vibe * 100);
+    const slider = document.getElementById('vibe-slider');
+    const val = slider ? parseInt(slider.value, 10) : Math.round(furryInstance.vibe * 100);
     const p = familySyncInstance.profile;
     if (p) {
         p.vibe = val;

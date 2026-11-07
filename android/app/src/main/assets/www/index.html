@@ -19,6 +19,15 @@
             <div class="onboarding-badge">WABI PLATFORM</div>
             <h1 class="onboarding-title">Yangi avlod oila va tarbiya tizimi</h1>
             <p class="onboarding-desc">Oila &amp; Intizom platformasiga xush kelibsiz. Hayotingizni tartibga soling.</p>
+            <div style="display: flex; justify-content: center; gap: 8px; margin-top: 12px; position: relative; z-index: 20;">
+                <button class="chip active" id="btn-onboarding-lens" onclick="toggleOnboardingMode('lens')">🔮 Interaktiv Linza</button>
+                <button class="chip" id="btn-onboarding-video" onclick="toggleOnboardingMode('video')">📹 Video Ko'rish</button>
+            </div>
+        </div>
+
+        <!-- Video Player Modal for Wabi Video -->
+        <div id="onboarding-video-box" style="display: none; position: relative; z-index: 15; width: 100%; max-width: 320px; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.4);">
+            <video id="wabi-preview-video" src="assets/wabi.mp4" playsinline controls loop style="width: 100%; border-radius: 24px; display: block;"></video>
         </div>
 
         <div id="onboarding-buttons">
@@ -125,12 +134,23 @@
                 Drag to express how you feel
             </p>
 
-            <div class="furry-box" id="furry-container">
+            <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 12px;">
+                <button class="chip active" id="btn-vibe-video" onclick="toggleVibeMode('video')">📹 Video Scrubbing</button>
+                <button class="chip" id="btn-vibe-canvas" onclick="toggleVibeMode('canvas')">🧸 3D Canvas Personaj</button>
+            </div>
+
+            <!-- Video Scrubber Container (1-Video exact match) -->
+            <div id="vibe-video-container" style="display: flex; justify-content: center; align-items: center; margin: 8px auto; max-width: 320px; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                <video id="vibe-scrub-video" src="assets/vibe.mp4" playsinline muted preload="auto" style="width: 100%; display: block; border-radius: 24px; pointer-events: none;"></video>
+            </div>
+
+            <!-- 3D Canvas Container -->
+            <div class="furry-box" id="furry-container" style="display: none;">
                 <canvas id="furry-canvas"></canvas>
             </div>
 
             <div class="vibe-slider-wrapper">
-                <input type="range" id="vibe-slider" class="vibe-input-range" min="0" max="100" value="75">
+                <input type="range" id="vibe-slider" class="vibe-input-range" min="0" max="100" value="0">
                 <div class="vibe-labels-row">
                     <span>Not great 🥱</span>
                     <span>Amazing 🤩</span>

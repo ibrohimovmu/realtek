@@ -54,44 +54,39 @@ jobs:
             exit 1
           fi
           echo "Packaging APK from $APK_PATH"
-          cp "$APK_PATH" Wabi-v1.0.1.apk
-          cp "$APK_PATH" Wabi-Family-v1.0.1.apk
-          cp "$APK_PATH" Wabi-Discipline.apk
+          cp "$APK_PATH" Wabi-v1.0.2-HD-Bundle.apk
+          cp "$APK_PATH" Wabi-Family-v1.0.2.apk
 
-      - name: Upload Wabi-v1.0.1.apk Artifact
+      - name: Upload Wabi-v1.0.2.apk Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Wabi-v1.0.1-APK
+          name: Wabi-v1.0.2-APK
           path: |
-            Wabi-v1.0.1.apk
-            Wabi-Family-v1.0.1.apk
-            Wabi-Discipline.apk
+            Wabi-v1.0.2-HD-Bundle.apk
+            Wabi-Family-v1.0.2.apk
           retention-days: 30
 
-      - name: Publish v1.0.1 to GitHub Releases
+      - name: Publish v1.0.2 to GitHub Releases
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: wabi-v1.0.1
-          name: "WABI v1.0.1 — Oila & Intizom (Smart Family Discipline)"
+          tag_name: wabi-v1.0.2
+          name: "WABI v1.0.2 — HD Video Scrubber & Complete Family Discipline Bundle"
           make_latest: true
           body: |
-            ## 🌟 WABI v1.0.1 (`Wabi-v1.0.1.apk`)
+            ## 🌟 WABI v1.0.2 HD Media Bundle (`Wabi-v1.0.2-HD-Bundle.apk`)
 
-            Ota-ona va farzandlar uchun "Oila & Intizom" (Smart Discipline & Focus Ecosystem) — 100% Realtime & Offline Assets:
+            Ota-ona va farzandlar uchun to'liq video scrubbing, 3D Canvas va ensiklopediyani o'z ichiga olgan to'liq APK:
 
-            ### ✨ Asosiy Imkoniyatlar:
-            - 🚀 **`file:///android_asset/www/index.html`** orqali to'g'ridan-to'g'ri ishonchli yuklanish (Net errorlari yo'q).
-            - 🔮 **"Meet Wabi" Liquid Glass Lens Swipe:** WebGL qavariq shisha linzasi, ranglar sinishi (Chromatic Aberration) va 35 ta 2D fizika pufakchalari otilib chiqishi.
-            - 🧸 **"What's Your Vibe Today?" 3D Paxmoq Personaj:** 3,500 ta procedural fur shell rendering, kayfiyatga qarab yashil/olovrang/qizil rangga va ko'z morfingiga ega.
+            ### ✨ Yangiliklar:
+            - 📹 **`vibe.mp4` va `wabi.mp4` HD Videolari APK ichiga to'liq joylandi:** Slayder surilganda 1-videodagi kabi frame-accurate video scrubbing va 3D Canvas personaji.
+            - 🚀 **`file:///android_asset/www/index.html`** orqali 100% offline va qotmasdan ishlaydi.
             - 📖 **Tarbiya Ensiklopediyasi:** 5 ta katta kategoriya, 40+ to'liq psixologik tahlillar va hayotiy vaziyatlar.
             - 🤝 **Dardkash:** Hissiy AI do'st va maslahatchi.
-            - 👑 **Dual Role Tizimi:** Ota-ona (Parent) va Farzand (Kid) rejimlari 6 xonali oila kodi orqali real vaqtda bog'lanadi.
-            - 🛡️ **Haqiqiy Android Nazorati:** `UsageStatsManager` va `AccessibilityService` orqali Instagram/o'yinlar 10-daqiqa limiti tugashi bilan "Warm Espresso Focus Lock" ekrani bilan bloklash.
-            - 🕌 **Namangan Namoz Vaqtlari:** Aladhan API va tizim `AlarmClock` orqali 5 mahal namozga avtomatik budilnik qo'yish.
+            - 🛡️ **Instagram & O'yinlar 10-Daqiqa Qoidasi:** `FocusLockAccessibilityService` orqali qattiq bloklash.
+            - 🕌 **Namangan Namoz Vaqtlari:** Aladhan API va `AlarmClock` orqali 5 mahal namozga avtomatik budilnik qo'yish.
           files: |
-            Wabi-v1.0.1.apk
-            Wabi-Family-v1.0.1.apk
-            Wabi-Discipline.apk
+            Wabi-v1.0.2-HD-Bundle.apk
+            Wabi-Family-v1.0.2.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

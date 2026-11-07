@@ -7,7 +7,6 @@ package-lock.json
 *.zip
 *.rar
 *.7z
-*.mp4
 
 # Android & Gradle
 .gradle/
