@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: 20
 
-      - name: Sync NOVA Zero-UI Assets to Android Bundle
+      - name: Sync NOVA Translucent Overlay Assets to Android Bundle
         run: |
           npm run sync
 
@@ -38,40 +38,41 @@ jobs:
         with:
           gradle-version: 8.7
 
-      - name: Build Nova-Jarvis APK (API 26 - API 35)
+      - name: Build Translucent Nova Overlay APK (API 26 - API 35)
         working-directory: android
         run: |
           gradle assembleDebug --stacktrace
 
-      - name: Package Nova-Jarvis.apk
+      - name: Package APK Files
         run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk Nova-Overlay-v3.0.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk Nova-Jarvis.apk
 
-      - name: Upload Nova-Jarvis.apk Artifact
+      - name: Upload Nova-Overlay-v3.0.apk Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Nova-Jarvis-APK
+          name: Nova-Overlay-v3.0-APK
           path: |
+            Nova-Overlay-v3.0.apk
             Nova-Jarvis.apk
-            android/app/build/outputs/apk/debug/*.apk
           retention-days: 30
 
-      - name: Publish Nova-Jarvis.apk to GitHub Releases
+      - name: Publish v3.0.0 to GitHub Releases
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: nova-jarvis-v2.0.0
-          name: "NOVA (Nova-Jarvis.apk) v2.0.0 — Autonomous AI Assistant & Digital Twin"
+          tag_name: nova-overlay-v3.0.0
+          name: "NOVA v3.0.0 — 100% Shaffof (Translucent) Bixby Mini Card & Gemini Live Edge Overlay"
+          make_latest: true
           body: |
-            ## 🌌 NOVA (`Nova-Jarvis.apk`) — Zero-UI Autonomous AI & Digital Twin (API 26 – API 35)
+            ## 🌌 NOVA v3.0.0 (`Nova-Overlay-v3.0.apk` / `Nova-Jarvis.apk`) — 100% Translucent Compact Overlay
 
-            - **Zero-UI 60/120 FPS Orb Engine:** 4 ta jonli FFT skin (`Nova Cyan Ring`, `Solar Eclipse`, `Quantum Particle Sphere`, `Violet Aura`) + Bixby-uslubidagi Compact Bottom Pill rejimi + 1.5s Long-Press / 2-barmoq swipe orqali ochiluvchi yashirin **Nova Studio**.
-            - **Voice Biometrics & Anti-Bixby Semantic VAD:** 3 namuna orqali ovoz egasini tanish + gap bog'lovchilar bilan (`va`, `keyin`, `yani`, `lekin`, `haligi...`) tugaganda 3.8 soniyagacha fikr tugashini kutish.
-            - **Lock-Screen Auto-Unlock Engine:** Ekran qulflangan paytda "Hey Nova, qulfni och" buyrug'i orqali PIN/parolni avtomatik terib ochish.
-            - **6-Gudok Call Secretary & Relationship Matrix:** 6 ta chaqiruvdan so'ng 7-gudokda avtomatik ko'tarib, Ota-Ona/Bobo-Buviga sizlab va ehtirom bilan, Ustozga rasmiy, Do'stlarga samimiy `"bro"` ohangida, Begonaga tekshiruvchi ohangda jonli gaplashish va yozib olish.
-            - **Telegram Plus (`org.telegram.plus`) & Ghost Twin:** Orqa fonda Notification `RemoteInput`, Accessibility UI avto-yozish va MTProto Userbot.
-            - **Focus Guardian & 5-Mahal Namoz Budilnigi:** Instagramda 10 daqiqadan ko'p o'tirilsa ovozli ogohlantirish bilan yopish va 30 daqiqa bloklash + 5 mahal namoz vaqtlariga avtomatik tizim budilnigi (`EXTRA_SKIP_UI`).
+            - **100% Shaffof Oyna (`Theme.Translucent.NoTitleBar` + `Color.TRANSPARENT`):** Ekranning yuqori 75% qismi to'liq shaffof — orqadagi telefon ekrani (launcher va ilovalar) ko'rinib turadi, tepaga bosganda overlay yopiladi.
+            - **Rejim A (Bixby Mini Card):** Pastki markazda `68x68px` 3D suyuq ko'k-firuza sfera + ixcham xira-shaffof kartochka (`⚙️` sozlamalar va `⌨️` klaviatura tugmalari bilan).
+            - **Rejim B (Gemini Live Edge Glow):** Ekranning 4 ta cheti bo'ylab ko'k-firuza neon nur (Edge Glow), pastki ko'k zarralar (particle mist), `"Share screen with Live"` va pastki yumaloq kapsula.
+            - **Haqiqiy Ovoz (3.5s Pauza Kutish) & Qurilma Boshqaruvi:** Gemini API + Groq API haqiqiy `fetch`, `PackageManager` orqali ilovalarni ochish (*"Telegram Plus'ni och"*, *"Instagramni och"*), `AlarmClock` budilnik va `NovaAccessibilityService`.
           files: |
+            Nova-Overlay-v3.0.apk
             Nova-Jarvis.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
