@@ -343,10 +343,47 @@
       const bridge = window.NovaBridge || window.NovaNative;
       const lower = text.toLowerCase().replace(/[‘’ʻʼ`´]/g, "'").trim();
 
-      // 1) Open App ("Telegram Plus'ni och", "Instagramni och", "YouTube'ni och", "och ...")
+      // 1) Send Telegram Plus Message / Open Contact Chat
+      // ("plusga kir jamshidga salom deb yoz", "plusga kir jamshidga yoz", "jamshidga salom deb yoz", "jamshidga yoz")
+      const tgMatchWithMsg = lower.match(
+        /(?:(?:telegram(?: plus)?|plus)(?:ga|da)?\s+)?(?:kir(?:ib)?\s+)?([a-zA-Z0-9_ʻʼ'‘’]+?)(?:ga|ka)\s+(.+?)\s+(?:deb\s+)?(?:yoz(?:ib\s+qo'y)?|jo'nat|yubor)/i
+      );
+      if (tgMatchWithMsg && tgMatchWithMsg[1] && tgMatchWithMsg[2]) {
+        const contact = tgMatchWithMsg[1].trim();
+        const msg = tgMatchWithMsg[2].trim();
+        try {
+          if (bridge && typeof bridge.sendTelegramMessage === 'function') {
+            bridge.sendTelegramMessage('org.telegram.plus', contact, msg);
+          }
+        } catch (e) {}
+        return {
+          reply: `Telegram Plus: ${contact}ga "${msg}" deb yozib yuboryapman, bro.`,
+          autoDismiss: false,
+        };
+      }
+
+      const tgMatchOpenChat = lower.match(
+        /(?:(?:telegram(?: plus)?|plus)(?:ga|da)?\s+)?(?:kir(?:ib)?\s+)?([a-zA-Z0-9_ʻʼ'‘’]+?)(?:ga|ka)?\s+(?:yoz|xabar yoz|salom yoz|chatiga kir|chatini och)/i
+      );
+      if (tgMatchOpenChat && tgMatchOpenChat[1]) {
+        const contact = tgMatchOpenChat[1].trim();
+        if (!['plus', 'telegram', 'ilova', 'dastur'].includes(contact)) {
+          try {
+            if (bridge && typeof bridge.sendTelegramMessage === 'function') {
+              bridge.sendTelegramMessage('org.telegram.plus', contact, '');
+            }
+          } catch (e) {}
+          return {
+            reply: `Telegram Plus'ga kirib, ${contact}ning chatini ochyapman, bro.`,
+            autoDismiss: false,
+          };
+        }
+      }
+
+      // 2) Open App ("Telegram Plus'ni och", "Plusga kir", "Instagramni och", "YouTube'ga kir", "och ...", "kir ...")
       const openMatch =
-        lower.match(/^(.+?)(?:'ni|ni|nı|\s+ilovasini)?\s+(?:och(?:ib\s+ber)?|ishga\s+tushir|yoq)$/i) ||
-        lower.match(/^(?:och|open|открой|запусти)\s+(.+)$/i);
+        lower.match(/^(.+?)(?:'ni|ni|nı|'ga|ga|ka|\s+ilovasini|\s+dasturini)?\s+(?:och(?:ib\s+ber)?|kir(?:ib\s+ber)?|ishga\s+tushir|yoq)$/i) ||
+        lower.match(/^(?:och|kir|open|ishga\s+tushir|запусти|открой)\s+(.+)$/i);
 
       if (openMatch) {
         let appQuery = openMatch[1].replace(/^(ilova|dastur|app)\s+/i, '').trim();
@@ -354,7 +391,7 @@
           try {
             if (bridge && typeof bridge.unlockDevice === 'function') bridge.unlockDevice('');
           } catch (e) {}
-          return { reply: 'Ekran qulfini ochdim!', autoDismiss: true };
+          return { reply: 'Ekran qulfini ochdim, bro!', autoDismiss: true };
         }
 
         let launched = '';
@@ -365,27 +402,9 @@
         } catch (e) {}
 
         if (launched) {
-          return { reply: `${launched} ochilmoqda...`, autoDismiss: true };
+          return { reply: `${launched} ochilmoqda, bro...`, autoDismiss: true };
         }
         return { reply: `"${appQuery}" ilovasi topilmadi.`, autoDismiss: false };
-      }
-
-      // 2) Send Telegram Plus Message ("Jamshidga salom deb yoz")
-      const tgMatch = text.match(
-        /(?:telegram(?: plus)?da\s+)?([a-zA-Z0-9_ʻʼ'‘’]+?)(?:ga|ka)\s+(.+?)\s+(?:deb\s+)?(?:yoz(?:ib\s+qo'y)?|jo'nat|yubor)/i
-      );
-      if (tgMatch) {
-        const contact = tgMatch[1].trim();
-        const msg = tgMatch[2].trim();
-        try {
-          if (bridge && typeof bridge.sendTelegramMessage === 'function') {
-            bridge.sendTelegramMessage('org.telegram.plus', contact, msg);
-          }
-        } catch (e) {}
-        return {
-          reply: `Telegram Plus orqali ${contact}ga "${msg}" deb yozib yuboryapman.`,
-          autoDismiss: false,
-        };
       }
 
       // 3) Set System Alarm ("Soat 06:30 ga budilnik qo'y")
@@ -406,7 +425,7 @@
           }
         } catch (e) {}
         return {
-          reply: `Soat ${hh}:${mm} ga budilnik o'rnatdim!`,
+          reply: `Soat ${hh}:${mm} ga budilnik o'rnatdim, bro!`,
           autoDismiss: false,
         };
       }
@@ -420,13 +439,15 @@
         (localStorage.getItem('nova_groq_api_key') || '').trim() ||
         getDefaultGroqKey();
 
-      const systemPrompt = `Sen NOVA — Android smartfonining shaffof ustki qatlamida ishlovchi jonli ovozli AI yordamchisan.
-Qoidalar:
-1. O'zbek tilida (yoki savol berilgan tilda) qisqa, aniq va samimiy (1-2 jumla) javob ber.
-2. Agar foydalanuvchi ilova ochishni, budilnik qo'yishni yoki Telegramda xabar yozishni so'rasa, javob oxirida ACTION_JSON qo'sh:
+      const systemPrompt = `Sen NOVA — foydalanuvchining eng yaqin do'sti, raqamli egizagi (Digital Twin) va smartfonidagi shaxsiy jonli AI yordamchisisan.
+Sening xaraktering va ovoz ohanging:
+1. Tirik, samimiy insondek, do'stona "bro / do'stim" ohangida gapirasan. Hech qachon robotdek rasmiy va kitobiy gapirma!
+2. Javoblaring juda ixcham (1-2 ta chiroyli jumla), jonli va ma'noli bo'lsin.
+3. Foydalanuvchi buyruq berganda darhol do'stona tasdiqla (masalan: "Bajarildi, bro!", "Hozir ulab beraman!", "Tayyor, ochyapman!").
+4. Agar foydalanuvchi ilova ochishni, Telegramda xabar yozishni yoki budilnik qo'yishni so'rasa, javob oxiriga ACTION_JSON qo'sh:
    ACTION_JSON:{"action":"OPEN_APP","app":"Telegram Plus"}
-   yoki ACTION_JSON:{"action":"SET_ALARM","hour":6,"minute":30,"label":"Bomdod"}
-   yoki ACTION_JSON:{"action":"SEND_TG","contact":"Jamshid","text":"Salom"}`;
+   yoki ACTION_JSON:{"action":"SEND_TG","contact":"Jamshid","text":"Salom"}
+   yoki ACTION_JSON:{"action":"SET_ALARM","hour":6,"minute":30,"label":"Bomdod"}`;
 
       if (geminiKey) {
         try {

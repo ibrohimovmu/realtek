@@ -38,7 +38,7 @@ body {
 }
 
 /* ============================================================================
- * 2. 4-SIDED GEMINI LIVE CYAN-BLUE NEON EDGE GLOW + PARTICLE MIST
+ * 2. ULTRA-THIN CYBER NEON EDGE RIM & GEMINI CORNER BRACKETS
  * ============================================================================ */
 #edge-glow-container {
   position: fixed;
@@ -46,33 +46,89 @@ body {
   z-index: 2;
   pointer-events: none;
   opacity: 0;
-  animation: edgeFadeIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: edgeFadeIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 @keyframes edgeFadeIn {
   from {
     opacity: 0;
+    transform: scale(0.992);
   }
   to {
     opacity: 1;
+    transform: scale(1);
   }
 }
 
+/* Ultra-thin (1.5px) neon gradient cyber border rim */
 .neon-edge-border {
   position: absolute;
-  inset: 0;
+  inset: 7px;
+  border-radius: 30px;
+  border: 1.5px solid rgba(0, 240, 255, 0.72);
   box-shadow:
-    inset 0 0 24px 6px rgba(0, 224, 255, 0.52),
-    inset 0 0 64px 16px rgba(0, 119, 255, 0.28),
-    inset 0 -80px 110px -20px rgba(0, 195, 255, 0.42);
-  transition: box-shadow 0.22s ease;
+    0 0 10px 1px rgba(0, 240, 255, 0.45),
+    inset 0 0 8px 1px rgba(0, 150, 255, 0.22);
+  transition: all 0.28s ease;
 }
 
 body[data-speaking-active="true"] .neon-edge-border {
+  border-color: rgba(56, 189, 248, 0.95);
   box-shadow:
-    inset 0 0 34px 11px rgba(0, 240, 255, 0.82),
-    inset 0 0 88px 24px rgba(0, 132, 255, 0.48),
-    inset 0 -110px 140px -15px rgba(56, 189, 248, 0.64);
+    0 0 16px 2px rgba(0, 240, 255, 0.75),
+    inset 0 0 12px 2px rgba(56, 189, 248, 0.35);
+}
+
+/* Gemini Live Top & Bottom Corner Brackets */
+.cyber-corner {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border: 2.5px solid #ffffff;
+  pointer-events: none;
+  opacity: 0.92;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.corner-tl {
+  top: 10px;
+  left: 10px;
+  border-right: none;
+  border-bottom: none;
+  border-top-left-radius: 24px;
+  box-shadow: -2px -2px 10px rgba(0, 240, 255, 0.65);
+}
+
+.corner-tr {
+  top: 10px;
+  right: 10px;
+  border-left: none;
+  border-bottom: none;
+  border-top-right-radius: 24px;
+  box-shadow: 2px -2px 10px rgba(0, 240, 255, 0.65);
+}
+
+.corner-bl {
+  bottom: 10px;
+  left: 10px;
+  border-right: none;
+  border-top: none;
+  border-bottom-left-radius: 24px;
+  box-shadow: -2px 2px 10px rgba(0, 240, 255, 0.65);
+}
+
+.corner-br {
+  bottom: 10px;
+  right: 10px;
+  border-left: none;
+  border-top: none;
+  border-bottom-right-radius: 24px;
+  box-shadow: 2px 2px 10px rgba(0, 240, 255, 0.65);
+}
+
+body[data-speaking-active="true"] .cyber-corner {
+  border-color: #00f0ff;
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.9);
 }
 
 #bottom-mist-canvas {
@@ -81,7 +137,8 @@ body[data-speaking-active="true"] .neon-edge-border {
   right: 0;
   bottom: 0;
   width: 100%;
-  height: 240px;
+  height: 100px;
+  opacity: 0.35;
   pointer-events: none;
 }
 

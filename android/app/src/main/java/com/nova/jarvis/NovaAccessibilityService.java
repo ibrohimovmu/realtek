@@ -431,12 +431,24 @@ public class NovaAccessibilityService extends AccessibilityService implements Te
         switch (pendingMsgStage) {
             case 1: {
                 // Click Search icon in Telegram Plus / Telegram
-                AccessibilityNodeInfo searchBtn = findNodeByExactTextOrDesc(root, "Search");
+                AccessibilityNodeInfo searchBtn = findNodeByIdContains(root, "menu_search");
+                if (searchBtn == null) searchBtn = findNodeByIdContains(root, "search");
+                if (searchBtn == null) searchBtn = findNodeByDescContains(root, "search");
+                if (searchBtn == null) searchBtn = findNodeByDescContains(root, "qidir");
+                if (searchBtn == null) searchBtn = findNodeByDescContains(root, "поиск");
+                if (searchBtn == null) searchBtn = findNodeByExactTextOrDesc(root, "Search");
                 if (searchBtn == null) searchBtn = findNodeByExactTextOrDesc(root, "Qidirish");
                 if (searchBtn == null) searchBtn = findNodeByExactTextOrDesc(root, "Поиск");
                 if (searchBtn != null && clickNodeOrParent(searchBtn)) {
                     pendingMsgStage = 2;
-                    handler.postDelayed(this::stepTelegramAutomation, 550L);
+                    handler.postDelayed(this::stepTelegramAutomation, 500L);
+                } else {
+                    // If already on search view, proceed directly to stage 2
+                    AccessibilityNodeInfo input = findFirstEditableNode(root);
+                    if (input != null) {
+                        pendingMsgStage = 2;
+                        handler.postDelayed(this::stepTelegramAutomation, 200L);
+                    }
                 }
                 break;
             }
@@ -445,15 +457,27 @@ public class NovaAccessibilityService extends AccessibilityService implements Te
                 if (searchInput != null) {
                     setNodeText(searchInput, pendingMsgRecipient);
                     pendingMsgStage = 3;
-                    handler.postDelayed(this::stepTelegramAutomation, 950L);
+                    handler.postDelayed(this::stepTelegramAutomation, 800L);
                 }
                 break;
             }
             case 3: {
+                // Find contact matching recipient name in search results
                 AccessibilityNodeInfo matchNode = findNodeContainingText(root, pendingMsgRecipient, true);
+                if (matchNode == null) {
+                    // Try finding any chat list cell in results
+                    matchNode = findNodeByIdContains(root, "cell");
+                    if (matchNode == null) matchNode = findNodeByIdContains(root, "chat");
+                }
                 if (matchNode != null && clickNodeOrParent(matchNode)) {
-                    pendingMsgStage = 4;
-                    handler.postDelayed(this::stepTelegramAutomation, 750L);
+                    if (pendingMsgText.isEmpty()) {
+                        // User only wanted to enter the chat! Finished.
+                        pendingMsgStage = 0;
+                        showAgentHudBanner("✓ " + pendingMsgRecipient + " chati ochildi");
+                    } else {
+                        pendingMsgStage = 4;
+                        handler.postDelayed(this::stepTelegramAutomation, 700L);
+                    }
                 }
                 break;
             }
@@ -462,12 +486,14 @@ public class NovaAccessibilityService extends AccessibilityService implements Te
                 if (msgBox != null) {
                     setNodeText(msgBox, pendingMsgText);
                     pendingMsgStage = 5;
-                    handler.postDelayed(this::stepTelegramAutomation, 450L);
+                    handler.postDelayed(this::stepTelegramAutomation, 400L);
                 }
                 break;
             }
             case 5: {
-                AccessibilityNodeInfo sendBtn = findNodeByExactTextOrDesc(root, "Send");
+                AccessibilityNodeInfo sendBtn = findNodeByIdContains(root, "send");
+                if (sendBtn == null) sendBtn = findNodeByDescContains(root, "send");
+                if (sendBtn == null) sendBtn = findNodeByExactTextOrDesc(root, "Send");
                 if (sendBtn == null) sendBtn = findNodeByExactTextOrDesc(root, "Yuborish");
                 if (sendBtn == null) sendBtn = findNodeByExactTextOrDesc(root, "Отправить");
                 if (sendBtn != null && clickNodeOrParent(sendBtn)) {
@@ -576,6 +602,17 @@ public class NovaAccessibilityService extends AccessibilityService implements Te
         if (d != null && d.toString().equalsIgnoreCase(target)) return node;
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo found = findNodeByExactTextOrDesc(node.getChild(i), target);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private AccessibilityNodeInfo findNodeByDescContains(AccessibilityNodeInfo node, String keyword) {
+        if (node == null || keyword == null) return null;
+        CharSequence d = node.getContentDescription();
+        if (d != null && d.toString().toLowerCase().contains(keyword.toLowerCase())) return node;
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo found = findNodeByDescContains(node.getChild(i), keyword);
             if (found != null) return found;
         }
         return null;

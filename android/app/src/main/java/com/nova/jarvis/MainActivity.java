@@ -62,7 +62,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
 
     private static final int REQ_MIC = 5002;
     private static final int REQ_PHONE = 5003;
-    private static final long PAUSE_FINALIZE_MS = 3200L;
+    private static final long PAUSE_FINALIZE_MS = 1400L; // Snappy 1.4s silence finalizer
 
     private static MainActivity activeInstance;
     private static volatile boolean micClaimedByWebView = false;
@@ -473,8 +473,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         long waitMs = PAUSE_FINALIZE_MS;
         String lower = currentFullText.trim().toLowerCase(Locale.ROOT);
         if (lower.endsWith(" va") || lower.endsWith(" keyin") || lower.endsWith(" yani")
-                || lower.endsWith(" lekin") || lower.endsWith(" haligi")) {
-            waitMs = 4200L;
+                || lower.endsWith(" lekin") || lower.endsWith(" haligi")
+                || lower.endsWith(" chunki") || lower.endsWith(" yoki") || lower.endsWith(" a")) {
+            waitMs = 2100L; // Shortened from 4200ms to 2.1s for conjunctions
         }
         mainHandler.postDelayed(finalizeSpeechTask, waitMs);
     }
@@ -704,7 +705,35 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             return;
         }
         try {
-            tts.setLanguage(pickLocale(text, lang));
+            Locale targetLocale = pickLocale(text, lang);
+            tts.setLanguage(targetLocale);
+
+            // Select highest quality / natural sounding voice if available
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    Set<Voice> voices = tts.getVoices();
+                    if (voices != null && !voices.isEmpty()) {
+                        Voice best = null;
+                        for (Voice v : voices) {
+                            if (v.getLocale() != null && v.getLocale().getLanguage().equals(targetLocale.getLanguage())) {
+                                if (!v.isNetworkConnectionRequired()) {
+                                    if (best == null || v.getQuality() > best.getQuality()) {
+                                        best = v;
+                                    }
+                                }
+                            }
+                        }
+                        if (best != null) {
+                            tts.setVoice(best);
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
+
+            // Warm, natural human cadence (not robotic or monotone)
+            tts.setPitch(1.05f);
+            tts.setSpeechRate(1.03f);
+
             tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "nova_" + System.currentTimeMillis());
         } catch (Throwable t) {
             notifyJsEvent("tts:done", "{}");

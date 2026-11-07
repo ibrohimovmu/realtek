@@ -311,11 +311,11 @@ public class NovaBridge {
     // ========================================================================
     @JavascriptInterface
     public boolean sendTelegramMessage(String preferredPackage, String recipient, String message) {
-        if (recipient == null || message == null) return false;
+        if (recipient == null || recipient.trim().isEmpty()) return false;
         String cleanRec = recipient.trim();
-        String cleanMsg = message.trim();
+        String cleanMsg = message == null ? "" : message.trim();
 
-        if (NovaNotificationService.getInstance() != null) {
+        if (!cleanMsg.isEmpty() && NovaNotificationService.getInstance() != null) {
             if (NovaNotificationService.getInstance().sendInlineReply(cleanRec, cleanMsg)) {
                 return true;
             }
