@@ -18,10 +18,10 @@ function copyRecursiveSync(src, dest) {
 }
 
 const srcDir = path.resolve(__dirname, '../www');
-const targetPublic = path.resolve(__dirname, '../android/app/src/main/assets/public');
+const targetWww = path.resolve(__dirname, '../android/app/src/main/assets/www');
 const targetRoot = path.resolve(__dirname, '../android/app/src/main/assets');
 
-console.log(`Syncing AURA bundle from ${srcDir} to Android assets...`);
-copyRecursiveSync(srcDir, targetPublic);
+console.log(`Syncing www to Android assets...`);
+copyRecursiveSync(srcDir, targetWww);
 copyRecursiveSync(srcDir, targetRoot);
-console.log('✓ Successfully synced AURA assets into Android APK bundle!');
+console.log('✓ Successfully synced www to android/app/src/main/assets/www and root assets!');

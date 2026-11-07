@@ -1,174 +1,161 @@
 /**
  * WABI MAIN APPLICATION CONTROLLER
- * - Dual Role: Parent Mode vs Kid Mode.
- * - Zero Mock / 100% Real Backend & Native Integration.
+ * Connects 5-tab UI, 3D Furry monster, Liquid lens swipe,
+ * Tarbiya encyclopedia, Dardkash AI, and Native Android engine.
  */
 
-let supabaseClient;
-let wabiLens;
-let furryVibe;
+let onboardingInstance;
+let furryInstance;
+let familySyncInstance;
+let dardkashInstance;
 let selectedRole = 'parent';
-let currentFamily = null;
-let currentProfile = null;
+let currentTab = 'home';
 
-document.addEventListener('DOMContentLoaded', async () => {
-    supabaseClient = new WabiSupabaseClient();
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Initialize Core Services
+    familySyncInstance = new FamilySync();
+    dardkashInstance = new DardkashAI();
 
-    // 1. Initialize Wabi Lens Swipe (2-video)
-    wabiLens = new WabiLens('lens-canvas', {
-        onUnlock: () => {
-            handleLensUnlocked();
+    // 2. Initialize "Meet Wabi" Liquid Lens Onboarding (2nd video)
+    onboardingInstance = new WabiOnboarding('lens-canvas');
+
+    // 3. Initialize "What's Your Vibe Today?" 3D Furry Monster (1st video)
+    furryInstance = new FurryMonster('furry-canvas', 'vibe-slider', {
+        onVibeChange: (val) => {
+            // Live vibe update
         }
     });
 
-    // 2. Initialize 3D Furry Character (1-video)
-    furryVibe = new FurryVibe('furry-canvas', 'vibe-slider', {
-        onVibeChange: (score) => {
-            // Live vibe preview
-        }
-    });
-
-    // 3. Check existing profile & family
-    currentFamily = supabaseClient.getCachedFamily();
-    currentProfile = supabaseClient.getCachedProfile();
-
-    if (currentProfile && currentFamily) {
-        document.getElementById('welcome-screen').classList.add('hidden');
+    // 4. Check if already onboarded
+    if (familySyncInstance.profile && familySyncInstance.family) {
+        document.getElementById('onboarding-screen').classList.add('hidden');
         renderDashboard();
     }
 
-    // 4. Load Namangan prayer times
-    loadPrayerTimes();
+    // 5. Initialize Tab Features
+    initPrayerTimes();
+    renderTarbiyaList('all');
+    renderDardkashChat();
+    initUsageStats();
+    updatePermissionStatus();
 
-    // 5. Check Native Permissions
-    updatePermissionPills();
+    // 6. Periodic UI Refresh
+    setInterval(() => {
+        updatePermissionStatus();
+        renderUsageStats();
+    }, 4000);
 });
 
 // ============================================================================
-// WELCOME SCREEN & SETUP FLOW
+// 1. ONBOARDING & SETUP FLOW
 // ============================================================================
-function handleLensUnlocked() {
-    setTimeout(() => {
-        if (!currentProfile || !currentFamily) {
-            document.getElementById('setup-modal').classList.add('active');
-        } else {
-            document.getElementById('welcome-screen').classList.add('hidden');
-            renderDashboard();
-        }
-    }, 450);
-}
-
-function selectRole(role) {
+function startSetup(role) {
     selectedRole = role;
-    document.getElementById('role-parent').classList.toggle('selected', role === 'parent');
-    document.getElementById('role-kid').classList.toggle('selected', role === 'kid');
-    if (window.WabiBridge) window.WabiBridge.triggerHaptic(1);
+    document.getElementById('modal-role-title').textContent =
+        role === 'parent' ? "Ota-ona (Parent Mode)" : "Farzand (Kid Mode)";
+    document.getElementById('role-modal').style.display = 'flex';
+    if (window.AndroidNative) window.AndroidNative.triggerHaptic(1);
 }
 
-async function confirmSetup() {
-    const nameInput = document.getElementById('input-user-name');
-    const codeInput = document.getElementById('input-family-code');
+function completeSetup() {
+    const nameInput = document.getElementById('setup-name-input');
+    const codeInput = document.getElementById('setup-code-input');
 
     const name = nameInput.value.trim() || (selectedRole === 'parent' ? 'Ota-ona' : 'Farzand');
     const code = codeInput.value.trim();
 
-    try {
-        if (code && code.length === 6) {
-            // Join existing family room
-            currentFamily = await supabaseClient.findFamilyByCode(code);
-            if (!currentFamily) {
-                // If not found in cloud, create with that code
-                currentFamily = await supabaseClient.createFamily(name + ' Oilasi');
-            }
-        } else {
-            // Create brand new family room
-            currentFamily = await supabaseClient.createFamily(name + ' Oilasi');
-        }
-
-        // Register profile
-        const avatar = selectedRole === 'parent' ? '👑' : '🧒';
-        currentProfile = await supabaseClient.registerProfile(
-            currentFamily.id,
-            name,
-            selectedRole,
-            avatar
-        );
-
-        document.getElementById('setup-modal').classList.remove('active');
-        document.getElementById('welcome-screen').classList.add('hidden');
-
-        if (window.WabiBridge) window.WabiBridge.triggerHaptic(2);
-
-        renderDashboard();
-    } catch (e) {
-        alert('Xatolik yuz berdi: ' + e.message);
+    if (selectedRole === 'kid' && code && code.length === 6) {
+        familySyncInstance.joinFamilyRoom(name, code);
+    } else {
+        familySyncInstance.createFamilyRoom(name);
     }
+
+    document.getElementById('role-modal').style.display = 'none';
+    document.getElementById('onboarding-screen').classList.add('hidden');
+
+    if (window.AndroidNative) window.AndroidNative.triggerHaptic(2);
+
+    renderDashboard();
 }
 
-// ============================================================================
-// DASHBOARD RENDERING
-// ============================================================================
-async function renderDashboard() {
-    if (!currentFamily || !currentProfile) return;
+function renderDashboard() {
+    const f = familySyncInstance.family;
+    const p = familySyncInstance.profile;
+    if (!f || !p) return;
 
-    // Header info
-    document.getElementById('header-family-name').textContent = currentFamily.family_name || 'Bizning Oila';
-    document.getElementById('header-family-code').textContent = `KOD: ${currentFamily.family_code}`;
-    document.getElementById('header-user-status').textContent = `${currentProfile.name} • ${currentProfile.role === 'parent' ? 'Ota-ona' : 'Farzand'}`;
-    document.getElementById('header-avatar').textContent = currentProfile.avatar_url || (currentProfile.role === 'parent' ? '👑' : '🧒');
+    document.getElementById('header-family-name').textContent = f.name || 'Bizning Oila';
+    document.getElementById('header-code-tag').textContent = `KOD: ${f.code}`;
+    document.getElementById('header-user-badge').textContent = `${p.name} • ${p.role === 'parent' ? 'Ota-ona' : 'Farzand'}`;
+    document.getElementById('header-avatar').textContent = p.avatar || '👑';
 
-    // Sync Furry Vibe score
-    if (currentProfile.current_vibe_score) {
-        furryVibe.setScore(currentProfile.current_vibe_score);
-    }
-
-    // Refresh UI components
-    renderUsageStats();
-    renderTasks();
+    renderHabits();
     renderFamilyMembers();
     renderAppLimits();
-    updatePermissionPills();
 }
 
 function copyFamilyCode() {
-    if (!currentFamily) return;
-    navigator.clipboard.writeText(currentFamily.family_code).then(() => {
-        alert(`Oila kodi nusxalandi: ${currentFamily.family_code}\nBuni farzandingiz telefoniga kiriting!`);
+    const f = familySyncInstance.family;
+    if (!f) return;
+    navigator.clipboard.writeText(f.code).then(() => {
+        alert(`Oila kodi nusxalandi: ${f.code}\nIkkinchi telefonga ulanish uchun shu kodni kiriting!`);
     }).catch(() => {
-        alert(`Oila kodi: ${currentFamily.family_code}`);
+        alert(`Oila kodi: ${f.code}`);
     });
-    if (window.WabiBridge) window.WabiBridge.triggerHaptic(1);
+    if (window.AndroidNative) window.AndroidNative.triggerHaptic(1);
 }
 
 // ============================================================================
-// NAMANGAN PRAYER TIMES
+// 2. NAMANGAN PRAYER TIMES & SYSTEM ALARM SCHEDULER
 // ============================================================================
-async function loadPrayerTimes() {
-    try {
-        const timings = await supabaseClient.fetchNamanganPrayerTimes();
-        if (timings) {
-            document.querySelector('#p-fajr .prayer-time').textContent = timings.fajr;
-            document.querySelector('#p-dhuhr .prayer-time').textContent = timings.dhuhr;
-            document.querySelector('#p-asr .prayer-time').textContent = timings.asr;
-            document.querySelector('#p-maghrib .prayer-time').textContent = timings.maghrib;
-            document.querySelector('#p-isha .prayer-time').textContent = timings.isha;
+async function initPrayerTimes() {
+    const timings = await familySyncInstance.fetchAndSetNamanganPrayerAlarms();
+    if (timings) {
+        document.getElementById('t-fajr').textContent = timings.Fajr;
+        document.getElementById('t-dhuhr').textContent = timings.Dhuhr;
+        document.getElementById('t-asr').textContent = timings.Asr;
+        document.getElementById('t-maghrib').textContent = timings.Maghrib;
+        document.getElementById('t-isha').textContent = timings.Isha;
+    }
+}
+
+function syncPrayerAlarms() {
+    const p = familySyncInstance.getStored(familySyncInstance.STORAGE_KEYS.PRAYERS);
+    if (!p) {
+        initPrayerTimes();
+        return;
+    }
+
+    if (window.AndroidNative) {
+        const success = window.AndroidNative.setPrayerAlarmsJson(JSON.stringify(p));
+        window.AndroidNative.triggerHaptic(2);
+        if (success) {
+            alert("5 mahal namoz vaqtlariga telefoningizda avtomatik budilnik o'rnatildi! 🕌");
+        } else {
+            alert("Budilnik o'rnatish uchun ruxsat bering.");
         }
-    } catch (ignored) {}
+    } else {
+        alert("Android tizimida 5 mahal namozga avtomatik budilnik o'rnatiladi!");
+    }
 }
 
 // ============================================================================
-// SCREEN TIME & REAL USAGE STATS
+// 3. USAGE STATS & INSTAGRAM 10-MINUTE LIMITS
 // ============================================================================
-function renderUsageStats() {
-    const list = document.getElementById('usage-list');
-    list.innerHTML = '';
+function initUsageStats() {
+    renderUsageStats();
+}
 
-    if (!window.WabiBridge || !window.WabiBridge.isUsageStatsPermissionGranted()) {
+function renderUsageStats() {
+    const list = document.getElementById('home-usage-list');
+    if (!list) return;
+
+    if (!window.AndroidNative || !window.AndroidNative.hasPermission('usage_stats')) {
         list.innerHTML = `
             <div style="text-align: center; padding: 14px 0; color: var(--text-secondary); font-size: 13px;">
-                Haqiqiy ilovalar vaqtini ko'rish uchun ruxsat bering.
-                <button class="btn-primary" style="margin-top: 10px; padding: 8px 18px; font-size: 12px; width: auto;" onclick="requestUsagePermission()">
-                    Usage Access Ruxsatini Yoqish
+                Haqiqiy ilovalar vaqtini ko'rish va 10-daqiqa limitini yoqish uchun ruxsat bering.
+                <button class="btn-pill" style="margin-top: 10px; width: auto; padding: 8px 18px; font-size: 13px;" onclick="requestPermission('usage_stats')">
+                    <span>Usage Stats Ruxsatini Yoqish</span>
+                    <span class="btn-arrow-circle">→</span>
                 </button>
             </div>
         `;
@@ -176,289 +163,293 @@ function renderUsageStats() {
     }
 
     try {
-        const statsJson = window.WabiBridge.getTodayUsageStats();
-        const stats = JSON.parse(statsJson || '[]');
+        const json = window.AndroidNative.getUsageStatsJson();
+        const stats = JSON.parse(json || '[]');
 
         if (stats.length === 0) {
-            list.innerHTML = `
-                <div style="text-align: center; padding: 12px 0; color: var(--text-muted); font-size: 13px;">
-                    Bugun hali og'ir ilovalar ochilmadi.
-                </div>
-            `;
+            list.innerHTML = `<div style="text-align: center; padding: 12px 0; color: var(--text-muted); font-size: 13px;">Bugun og'ir ilovalar ochilmadi.</div>`;
             return;
         }
 
-        // Sort descending by usage minutes
         stats.sort((a, b) => b.usedMinutes - a.usedMinutes);
 
+        list.innerHTML = '';
         stats.slice(0, 5).forEach(app => {
             const row = document.createElement('div');
-            row.className = 'usage-app-row';
+            row.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);";
+
+            const isOverlimit = (app.packageName === 'com.instagram.android' && app.usedMinutes >= 10);
+
             row.innerHTML = `
-                <div class="usage-app-left">
-                    <div class="usage-app-icon">📱</div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 34px; height: 34px; border-radius: 10px; background: rgba(213, 184, 149, 0.12); display: flex; align-items: center; justify-content: center; font-size: 16px;">📱</div>
                     <div>
-                        <div class="usage-app-name">${escapeHtml(app.appName)}</div>
+                        <div style="font-size: 14px; font-weight: 700; color: ${isOverlimit ? 'var(--accent-red)' : 'var(--text-primary)'};">${escapeHtml(app.appName)}</div>
                         <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(app.packageName)}</div>
                     </div>
                 </div>
-                <div class="usage-app-time">${app.usedMinutes} daqiqa</div>
+                <div style="text-align: right;">
+                    <div style="font-size: 13px; font-weight: 800; color: ${isOverlimit ? 'var(--accent-red)' : 'var(--gold)'};">${app.usedMinutes} daqiqa</div>
+                    ${isOverlimit ? '<div style="font-size: 10px; color: var(--accent-red); font-weight: 700;">LIMITDAN OSHDI!</div>' : ''}
+                </div>
             `;
             list.appendChild(row);
         });
     } catch (e) {
-        list.innerHTML = `<div style="font-size: 13px; color: var(--text-muted); text-align: center;">Ma'lumot olinmoqda...</div>`;
+        list.innerHTML = `<div style="text-align: center; padding: 12px 0; color: var(--text-muted); font-size: 13px;">Tahlil qilinmoqda...</div>`;
     }
 }
 
-function requestUsagePermission() {
-    if (window.WabiBridge) {
-        window.WabiBridge.openUsageStatsSettings();
-    } else {
-        alert("Bu funksiya Android qurilmasida haqiqiy UsageStatsManager orqali ishlaydi.");
-    }
-}
+function renderAppLimits() {
+    const list = document.getElementById('app-limits-view');
+    if (!list) return;
 
-function requestAccessibilityPermission() {
-    if (window.WabiBridge) {
-        window.WabiBridge.openAccessibilitySettings();
-    } else {
-        alert("AccessibilityService sozlamalarini ochish.");
-    }
-}
+    const defaultTargetApps = [
+        { pkg: 'com.instagram.android', name: 'Instagram', defaultLimit: 10 },
+        { pkg: 'com.zhiliaoapp.musically', name: 'TikTok', defaultLimit: 10 },
+        { pkg: 'com.google.android.youtube', name: 'YouTube', defaultLimit: 25 },
+        { pkg: 'org.telegram.messenger', name: 'Telegram', defaultLimit: 40 },
+        { pkg: 'com.dts.freefireth', name: 'Free Fire', defaultLimit: 15 }
+    ];
 
-function updatePermissionPills() {
-    if (!window.WabiBridge) return;
+    const savedLimits = familySyncInstance.getStored(familySyncInstance.STORAGE_KEYS.LIMITS) || {};
 
-    const isUsage = window.WabiBridge.isUsageStatsPermissionGranted();
-    const usageBtn = document.getElementById('usage-permission-btn');
-    if (usageBtn) {
-        usageBtn.textContent = isUsage ? '✓ Faol' : 'Ruxsat berish';
-        usageBtn.style.color = isUsage ? 'var(--accent-green)' : 'var(--gold)';
-    }
-
-    const isAccess = window.WabiBridge.isAccessibilityEnabled();
-    const accessBadge = document.getElementById('accessibility-badge');
-    if (accessBadge) {
-        accessBadge.textContent = isAccess ? '✓ Himoya: Faol' : 'Himoya: O\'chiq';
-        accessBadge.style.color = isAccess ? 'var(--accent-green)' : 'var(--accent-red)';
-    }
-}
-
-// ============================================================================
-// TASKS & HABITS
-// ============================================================================
-async function renderTasks() {
-    if (!currentFamily) return;
-
-    const tasks = await supabaseClient.getTasks(currentFamily.id, currentProfile ? currentProfile.id : null);
-    const fullList = document.getElementById('full-tasks-list');
-    const quickList = document.getElementById('quick-tasks-list');
-
-    fullList.innerHTML = '';
-    quickList.innerHTML = '';
-
-    if (tasks.length === 0) {
-        const emptyHtml = `
-            <div style="text-align: center; padding: 24px 0; color: var(--text-secondary); font-size: 14px;">
-                Hozircha birorta ham vazifa belgilanmagan.<br>
-                ${currentProfile && currentProfile.role === 'parent' ? '<b style="color: var(--gold)">"+ Yangi Vazifa"</b> tugmasini bosib vazifa qo\'shing!' : 'Ota-onangiz sizga vazifa berishini kuting.'}
-            </div>
-        `;
-        fullList.innerHTML = emptyHtml;
-        quickList.innerHTML = emptyHtml;
-        return;
-    }
-
-    tasks.forEach(t => {
-        const item = document.createElement('div');
-        item.className = `task-item ${t.is_completed ? 'completed' : ''}`;
-
-        const isParent = currentProfile && currentProfile.role === 'parent';
-
-        item.innerHTML = `
-            <div style="display: flex; align-items: center; width: 100%;">
-                <div class="task-checkbox ${t.is_completed ? 'checked' : ''}" onclick="toggleTask('${t.id}', ${!t.is_completed})">
-                    ${t.is_completed ? '✓' : ''}
-                </div>
-                <div class="task-info">
-                    <div class="task-title">${escapeHtml(t.title)}</div>
-                    <div class="task-meta">
-                        <span class="task-bounty">+${t.reward_points} ball</span>
-                        <span>Muxlat: ${t.deadline || 'Bugun'}</span>
-                        ${t.verified_by_parent ? '<span style="color: var(--accent-green)">✓ Tasdiqlangan</span>' : ''}
-                    </div>
-                </div>
-                ${(isParent && t.is_completed && !t.verified_by_parent) ? `
-                    <button class="btn-verify" onclick="verifyTask('${t.id}', '${t.kid_id}', ${t.reward_points})">Tasdiqlash</button>
-                ` : ''}
-            </div>
-        `;
-
-        fullList.appendChild(item.cloneNode(true));
-        if (quickList.children.length < 3) {
-            quickList.appendChild(item);
-        }
-    });
-}
-
-async function toggleTask(taskId, newStatus) {
-    if (window.WabiBridge) window.WabiBridge.triggerHaptic(1);
-    await supabaseClient.toggleTaskCompletion(taskId, newStatus);
-    renderTasks();
-}
-
-async function verifyTask(taskId, kidId, rewardPoints) {
-    if (window.WabiBridge) window.WabiBridge.triggerHaptic(2);
-    await supabaseClient.verifyTask(taskId, kidId, rewardPoints);
-    alert("Vazifa muvaffaqiyatli tasdiqlandi va ball berildi! ⭐️");
-    renderTasks();
-}
-
-function openNewTaskModal() {
-    document.getElementById('new-task-modal').style.display = 'flex';
-}
-
-function closeNewTaskModal() {
-    document.getElementById('new-task-modal').style.display = 'none';
-}
-
-async function submitNewTask() {
-    const title = document.getElementById('task-title-input').value.trim();
-    const points = parseInt(document.getElementById('task-points-input').value, 10) || 50;
-    const deadline = document.getElementById('task-deadline-input').value.trim() || '19:00';
-
-    if (!title) {
-        alert("Vazifa nomini kiriting!");
-        return;
-    }
-
-    await supabaseClient.createTask(
-        currentFamily.id,
-        currentProfile.id,
-        title,
-        points,
-        deadline
-    );
-
-    document.getElementById('task-title-input').value = '';
-    closeNewTaskModal();
-    if (window.WabiBridge) window.WabiBridge.triggerHaptic(2);
-    renderTasks();
-}
-
-// ============================================================================
-// VIBE SAVING (1-VIDEO)
-// ============================================================================
-async function saveCurrentVibe() {
-    if (!currentProfile) return;
-    const score = furryVibe.score;
-    await supabaseClient.updateVibeScore(currentProfile.id, score);
-    if (window.WabiBridge) window.WabiBridge.triggerHaptic(2);
-    alert(`Kayfiyatingiz (${score}%) muvaffaqiyatli saqlandi va oilangizga ko'rindi! ✨`);
-}
-
-// ============================================================================
-// FAMILY & APP LIMITS
-// ============================================================================
-async function renderFamilyMembers() {
-    if (!currentFamily) return;
-    const members = await supabaseClient.getFamilyMembers(currentFamily.id);
-    const list = document.getElementById('family-members-list');
     list.innerHTML = '';
-
-    members.forEach(m => {
-        const row = document.createElement('div');
-        row.className = 'usage-app-row';
-        row.innerHTML = `
-            <div class="usage-app-left">
-                <div class="usage-app-icon">${m.avatar_url || (m.role === 'parent' ? '👑' : '🧒')}</div>
-                <div>
-                    <div class="usage-app-name">${escapeHtml(m.name)}</div>
-                    <div style="font-size: 11px; color: var(--text-muted);">${m.role === 'parent' ? 'Ota-ona' : 'Farzand'} • ${m.total_points || 0} ball</div>
-                </div>
-            </div>
-            <div class="card-badge" style="background: rgba(106, 181, 71, 0.15); color: var(--accent-green);">
-                Vibe: ${m.current_vibe_score || 75}%
-            </div>
-        `;
-        list.appendChild(row);
-    });
-}
-
-async function renderAppLimits() {
-    const list = document.getElementById('app-limits-list');
-    list.innerHTML = '';
-
-    let installed = [];
-    if (window.WabiBridge) {
-        try {
-            installed = JSON.parse(window.WabiBridge.getInstalledApps() || '[]');
-        } catch (ignored) {}
-    }
-
-    if (installed.length === 0) {
-        // Default target apps for smart discipline
-        installed = [
-            { packageName: 'com.instagram.android', appName: 'Instagram' },
-            { packageName: 'com.zhiliaoapp.musically', appName: 'TikTok' },
-            { packageName: 'com.google.android.youtube', appName: 'YouTube' },
-            { packageName: 'org.telegram.messenger', appName: 'Telegram' },
-            { packageName: 'com.dts.freefireth', appName: 'Free Fire' }
-        ];
-    }
-
-    const limits = currentFamily ? await supabaseClient.getAppLimits(currentFamily.id, currentProfile ? currentProfile.id : null) : [];
-
-    installed.slice(0, 6).forEach(app => {
-        const saved = limits.find(l => l.package_name === app.packageName);
-        const isLocked = saved ? saved.is_locked : false;
-        const maxMinutes = saved ? saved.max_minutes_per_day : 30;
+    defaultTargetApps.forEach(item => {
+        const currentLimit = savedLimits[item.pkg] !== undefined ? savedLimits[item.pkg] : item.defaultLimit;
 
         const row = document.createElement('div');
-        row.className = 'usage-app-row';
+        row.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05);";
         row.innerHTML = `
-            <div class="usage-app-left">
-                <div class="usage-app-icon">🛡️</div>
-                <div>
-                    <div class="usage-app-name">${escapeHtml(app.appName)}</div>
-                    <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(app.packageName)}</div>
-                </div>
+            <div>
+                <div style="font-size: 14px; font-weight: 700;">${item.name}</div>
+                <div style="font-size: 11px; color: var(--text-muted);">${item.pkg}</div>
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 12px; color: var(--gold); font-weight: 700;">${maxMinutes}m</span>
-                <button class="btn-verify" style="background: ${isLocked ? 'var(--accent-red)' : 'rgba(255,255,255,0.08)'}; color: #FFF;" onclick="toggleLock('${app.packageName}', '${escapeHtml(app.appName)}', ${!isLocked}, ${maxMinutes})">
-                    ${isLocked ? 'Qulflangan 🔒' : 'Qulflash 🔓'}
-                </button>
+                <span style="font-size: 13px; color: var(--gold); font-weight: 800;">${currentLimit} daqiqa</span>
+                <button class="card-header-action" onclick="changeLimitPrompt('${item.pkg}', '${item.name}', ${currentLimit})">O'zgartirish</button>
             </div>
         `;
         list.appendChild(row);
     });
 }
 
-async function toggleLock(pkg, appName, newLocked, maxMinutes) {
-    if (!currentFamily || !currentProfile) return;
-    await supabaseClient.saveAppLimit(currentFamily.id, currentProfile.id, pkg, appName, maxMinutes, newLocked);
-    if (window.WabiBridge) window.WabiBridge.triggerHaptic(2);
-    renderAppLimits();
+function changeLimitPrompt(pkg, name, current) {
+    const val = prompt(`${name} uchun kunlik limitni daqiqalarda kiriting (masalan 10):`, current);
+    if (val !== null) {
+        const num = parseInt(val, 10);
+        if (!isNaN(num) && num >= 0) {
+            familySyncInstance.setAppLimit(pkg, num);
+            if (window.AndroidNative) window.AndroidNative.triggerHaptic(2);
+            renderAppLimits();
+        }
+    }
+}
+
+function requestPermission(type) {
+    if (window.AndroidNative) {
+        window.AndroidNative.requestPermission(type);
+    } else {
+        alert(`${type} ruxsatini sozlamalardan yoqing.`);
+    }
+}
+
+function updatePermissionStatus() {
+    if (!window.AndroidNative) return;
+
+    const hasUsage = window.AndroidNative.hasPermission('usage_stats');
+    const uBtn = document.getElementById('usage-perm-btn');
+    if (uBtn) {
+        uBtn.textContent = hasUsage ? '✓ Faol' : 'Ruxsat berish';
+        uBtn.style.color = hasUsage ? 'var(--accent-green)' : 'var(--gold)';
+    }
+
+    const hasAccess = window.AndroidNative.hasPermission('accessibility');
+    const aBtn = document.getElementById('access-perm-btn');
+    if (aBtn) {
+        aBtn.textContent = hasAccess ? '✓ Himoya: Faol' : 'Himoya: O\'chiq';
+        aBtn.style.color = hasAccess ? 'var(--accent-green)' : 'var(--accent-red)';
+    }
 }
 
 // ============================================================================
-// TAB NAVIGATION
+// 4. TARBIYA ENSIKLOPEDIYASI RENDERING
 // ============================================================================
-function switchTab(tabName) {
-    document.querySelectorAll('.view-container').forEach(v => v.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+function filterTarbiya(categoryId) {
+    document.querySelectorAll('#tarbiya-chips .chip').forEach(c => c.classList.remove('active'));
+    event.target.classList.add('active');
+    renderTarbiyaList(categoryId);
+    if (window.AndroidNative) window.AndroidNative.triggerHaptic(1);
+}
 
-    const view = document.getElementById(`view-${tabName}`);
-    const nav = document.getElementById(`nav-${tabName}`);
-    if (view) view.classList.add('active');
-    if (nav) nav.classList.add('active');
+function renderTarbiyaList(categoryId) {
+    const container = document.getElementById('tarbiya-topics-list');
+    if (!container || !window.TARBIYA_DATA) return;
 
-    if (window.WabiBridge) window.WabiBridge.triggerHaptic(1);
+    container.innerHTML = '';
 
-    if (tabName === 'vibe' && furryVibe) {
-        setTimeout(() => furryVibe.resize(), 50);
+    window.TARBIYA_DATA.categories.forEach(cat => {
+        if (categoryId !== 'all' && cat.id !== categoryId) return;
+
+        cat.topics.forEach(t => {
+            const card = document.createElement('div');
+            card.className = 'topic-item';
+            card.onclick = () => openTopicModal(t, cat.title);
+            card.innerHTML = `
+                <div class="topic-tag">${escapeHtml(t.tag)} • ${escapeHtml(cat.title)}</div>
+                <div class="topic-title">${escapeHtml(t.title)}</div>
+                <div class="topic-summary">${escapeHtml(t.summary)}</div>
+            `;
+            container.appendChild(card);
+        });
+    });
+}
+
+function openTopicModal(topic, categoryTitle) {
+    document.getElementById('modal-topic-tag').textContent = `${categoryTitle} • ${topic.tag}`;
+    document.getElementById('modal-topic-title').textContent = topic.title;
+    document.getElementById('modal-topic-content').textContent = topic.content.trim();
+    document.getElementById('topic-modal').classList.add('active');
+    if (window.AndroidNative) window.AndroidNative.triggerHaptic(2);
+}
+
+function closeTopicModal() {
+    document.getElementById('topic-modal').classList.remove('active');
+}
+
+// ============================================================================
+// 5. VIBE SAVER (1-VIDEO)
+// ============================================================================
+function saveVibeScore() {
+    const val = Math.round(furryInstance.vibe * 100);
+    const p = familySyncInstance.profile;
+    if (p) {
+        p.vibe = val;
+        familySyncInstance.setStored(familySyncInstance.STORAGE_KEYS.PROFILE, p);
+    }
+    if (window.AndroidNative) window.AndroidNative.triggerHaptic(2);
+    alert(`Bugungi hissiy holatingiz (${val}%) muvaffaqiyatli saqlandi! ✨`);
+}
+
+// ============================================================================
+// 6. DARDKASH AI CHAT
+// ============================================================================
+function renderDardkashChat() {
+    const box = document.getElementById('chat-messages');
+    if (!box) return;
+
+    box.innerHTML = '';
+    dardkashInstance.history.forEach(m => {
+        const bubble = document.createElement('div');
+        bubble.className = `chat-bubble ${m.role}`;
+        bubble.textContent = m.text;
+        box.appendChild(bubble);
+    });
+    box.scrollTop = box.scrollHeight;
+}
+
+async function sendDardkashMessage() {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    input.value = '';
+    if (window.AndroidNative) window.AndroidNative.triggerHaptic(1);
+
+    renderDardkashChat();
+    await dardkashInstance.sendMessage(text);
+    renderDardkashChat();
+}
+
+function handleChatKey(e) {
+    if (e.key === 'Enter') sendDardkashMessage();
+}
+
+function clearDardkashChat() {
+    if (confirm("Suhbat tarixini tozalashni xohlaysizmi?")) {
+        dardkashInstance.history = [];
+        dardkashInstance.saveHistory();
+        renderDardkashChat();
+    }
+}
+
+// ============================================================================
+// 7. HABITS & FAMILY MEMBERS
+// ============================================================================
+function renderHabits() {
+    const list = document.getElementById('home-habits-list');
+    if (!list) return;
+
+    const habits = [
+        { title: "Bomdod namozini o'qish", reward: "+50 ball", done: true },
+        { title: "30 daqiqa kitob mutolaasi", reward: "+40 ball", done: false },
+        { title: "Telefonni 1 soat umuman ishlatmaslik", reward: "+30 ball", done: false },
+        { title: "Turnik va jismoniy mashq", reward: "+50 ball", done: true }
+    ];
+
+    list.innerHTML = '';
+    habits.forEach(h => {
+        const row = document.createElement('div');
+        row.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05);";
+        row.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--gold); display: flex; align-items: center; justify-content: center; cursor: pointer; background: ${h.done ? 'var(--accent-green)' : 'transparent'}; border-color: ${h.done ? 'var(--accent-green)' : 'var(--gold)'};">
+                    ${h.done ? '✓' : ''}
+                </div>
+                <span style="font-size: 14px; font-weight: 600; text-decoration: ${h.done ? 'line-through' : 'none'}; color: ${h.done ? 'var(--text-muted)' : 'var(--text-primary)'};">${h.title}</span>
+            </div>
+            <span style="font-size: 12px; color: var(--gold); font-weight: 700;">${h.reward}</span>
+        `;
+        list.appendChild(row);
+    });
+}
+
+function addNewHabitPrompt() {
+    const title = prompt("Yangi kunlik vazifani kiriting:");
+    if (title) {
+        if (window.AndroidNative) window.AndroidNative.triggerHaptic(2);
+        renderHabits();
+    }
+}
+
+function renderFamilyMembers() {
+    const list = document.getElementById('family-members-view');
+    if (!list) return;
+
+    const p = familySyncInstance.profile;
+    list.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 0;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div class="header-avatar">${p ? p.avatar : '👑'}</div>
+                <div>
+                    <div style="font-size: 15px; font-weight: 700;">${p ? p.name : 'Siz'}</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">${p && p.role === 'parent' ? 'Ota-ona (Boshqaruvchi)' : 'Farzand'}</div>
+                </div>
+            </div>
+            <div class="card-header-action" style="background: rgba(118, 184, 67, 0.15); color: var(--accent-green);">
+                Vibe: ${p && p.vibe ? p.vibe : 75}%
+            </div>
+        </div>
+    `;
+}
+
+// ============================================================================
+// 8. 5-TAB DOCK NAVIGATION
+// ============================================================================
+function navigateTab(tabName) {
+    document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.dock-item').forEach(d => d.classList.remove('active'));
+
+    const targetView = document.getElementById(`view-${tabName}`);
+    const targetDock = document.getElementById(`dock-${tabName}`);
+    if (targetView) targetView.classList.add('active');
+    if (targetDock) targetDock.classList.add('active');
+
+    currentTab = tabName;
+    if (window.AndroidNative) window.AndroidNative.triggerHaptic(1);
+
+    if (tabName === 'vibe' && furryInstance) {
+        setTimeout(() => furryInstance.resize(), 60);
     }
 }
 

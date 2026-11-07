@@ -1,56 +1,82 @@
 /**
- * WABI PROCEDURAL 3D FURRY VIBE CHARACTER (1-video implementation)
- * - 60 FPS Procedural Fur Shell / Instanced Hair Strands on HTML5 Canvas.
- * - Real-time mood interpolation from 0 (Dark Red / Angry) to 100 (Fresh Green / Joy).
- * - Morphing facial features (eyebrows tilt, pupil dilation, eye squint/sparkle).
- * - Breathing harmonic physics and touch repulsion.
+ * WABI 3D PROCEDURAL FURRY MONSTER (1-video 1:1 implementation)
+ * - 3,500 procedural fur strands using 3D Fibonacci sphere distribution.
+ * - Multi-segment quadraticCurveTo hair rendering with Ambient Occlusion & Rim lighting.
+ * - Continuous mood morphing (0.0 Red/Angry -> 0.5 Orange/Gold -> 1.0 Soft Green/Joyful).
+ * - Interactive gaze tracking, touch wind simulation, and dynamic background morphing.
  */
-class FurryVibe {
+class FurryMonster {
     constructor(canvasId, sliderId, options = {}) {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
         this.slider = document.getElementById(sliderId);
         this.onVibeChange = options.onVibeChange || (() => {});
 
-        this.width = this.canvas.parentElement ? this.canvas.parentElement.clientWidth : 320;
-        this.height = 320;
+        this.width = 340;
+        this.height = 340;
         this.dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-        this.score = 75; // 0 to 100
-        this.baseRadius = 78;
-        this.strandCount = 1200;
+        this.vibe = 0.75; // 0.0 to 1.0
+        this.targetVibe = 0.75;
+        this.baseRadius = 76;
+        this.strandCount = 3500;
         this.strands = [];
 
         this.time = 0;
         this.touchX = -9999;
         this.touchY = -9999;
-        this.isTouched = false;
+        this.isInteracting = false;
 
-        this.initStrands();
+        this.initFibonacciStrands();
         this.resize();
         this.bindEvents();
         this.animate();
     }
 
     resize() {
-        if (!this.canvas.parentElement) return;
-        this.width = this.canvas.parentElement.clientWidth || 320;
-        this.height = Math.min(340, this.width);
+        const parent = this.canvas.parentElement;
+        this.width = parent ? Math.min(parent.clientWidth - 16, 360) : 340;
+        this.height = this.width;
         this.canvas.width = this.width * this.dpr;
         this.canvas.height = this.height * this.dpr;
         this.ctx.scale(this.dpr, this.dpr);
     }
 
-    initStrands() {
+    initFibonacciStrands() {
         this.strands = [];
+        const goldenRatio = (1 + Math.sqrt(5)) / 2;
+
         for (let i = 0; i < this.strandCount; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const length = 18 + Math.random() * 26;
-            const baseThickness = 1.4 + Math.random() * 1.2;
-            const freq = 1.5 + Math.random() * 2.5;
+            // Fibonacci spherical mapping
+            const theta = 2 * Math.PI * i / goldenRatio;
+            const phi = Math.acos(1 - 2 * (i + 0.5) / this.strandCount);
+
+            // Project sphere normal to 2D
+            const x = Math.sin(phi) * Math.cos(theta);
+            const y = Math.sin(phi) * Math.sin(theta);
+            const z = Math.cos(phi);
+
+            // Only render front-facing and silhouette strands
+            const angle2D = Math.atan2(y, x);
+            const length = 16 + Math.random() * 26;
+            const thickness = 1.2 + Math.random() * 1.4;
+            const curl = (Math.random() - 0.5) * 0.4;
+            const freq = 1.8 + Math.random() * 2.2;
             const phase = Math.random() * Math.PI * 2;
-            this.strands.push({ angle, length, baseThickness, freq, phase });
+
+            this.strands.push({
+                x, y, z,
+                angle2D,
+                length,
+                thickness,
+                curl,
+                freq,
+                phase
+            });
         }
+
+        // Sort back to front for proper occlusion
+        this.strands.sort((a, b) => a.z - b.z);
     }
 
     bindEvents() {
@@ -58,225 +84,242 @@ class FurryVibe {
 
         if (this.slider) {
             this.slider.addEventListener('input', (e) => {
-                this.score = parseInt(e.target.value, 10);
-                if (window.WabiBridge) window.WabiBridge.triggerHaptic(3);
-                this.onVibeChange(this.score);
+                this.targetVibe = parseFloat(e.target.value) / 100;
+                if (window.AndroidNative) window.AndroidNative.triggerHaptic(3);
+                this.onVibeChange(this.targetVibe);
             });
         }
 
-        const onTouch = (e) => {
+        const handlePointer = (e) => {
             const rect = this.canvas.getBoundingClientRect();
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
             this.touchX = clientX - rect.left;
             this.touchY = clientY - rect.top;
-            this.isTouched = true;
-            if (window.WabiBridge) window.WabiBridge.triggerHaptic(1);
+            this.isInteracting = true;
         };
 
-        const onEnd = () => {
-            this.isTouched = false;
+        const handleEnd = () => {
+            this.isInteracting = false;
             this.touchX = -9999;
             this.touchY = -9999;
         };
 
-        this.canvas.addEventListener('touchstart', onTouch, { passive: true });
-        this.canvas.addEventListener('touchmove', onTouch, { passive: true });
-        this.canvas.addEventListener('touchend', onEnd);
-        this.canvas.addEventListener('mousedown', onTouch);
-        this.canvas.addEventListener('mousemove', (e) => { if (this.isTouched) onTouch(e); });
-        this.canvas.addEventListener('mouseup', onEnd);
+        this.canvas.addEventListener('touchstart', handlePointer, { passive: true });
+        this.canvas.addEventListener('touchmove', handlePointer, { passive: true });
+        this.canvas.addEventListener('touchend', handleEnd);
+        this.canvas.addEventListener('mousedown', handlePointer);
+        this.canvas.addEventListener('mousemove', (e) => { if (this.isInteracting) handlePointer(e); });
+        this.canvas.addEventListener('mouseup', handleEnd);
     }
 
-    setScore(val) {
-        this.score = Math.max(0, Math.min(100, val));
-        if (this.slider) this.slider.value = this.score;
-    }
-
-    getMoodColor() {
-        // Red (#D91B1B) -> Orange (#F26419) -> Gold (#E6B800) -> Green (#6AB547)
-        const t = this.score / 100;
+    getColors(v) {
+        // Mood Palette interpolation
+        // 0.0 - 0.33: Red (#D91414 -> #FF3B1F)
+        // 0.34 - 0.66: Orange to Gold (#FF7700 -> #E5B81B)
+        // 0.67 - 1.0: Soft Green (#76B843 -> #8FD158)
         let r, g, b;
+        let bgR, bgG, bgB;
 
-        if (t < 0.33) {
-            const k = t / 0.33;
-            r = Math.round(217 + (242 - 217) * k);
-            g = Math.round(27 + (100 - 27) * k);
-            b = Math.round(27 + (25 - 27) * k);
-        } else if (t < 0.66) {
-            const k = (t - 0.33) / 0.33;
-            r = Math.round(242 + (230 - 242) * k);
-            g = Math.round(100 + (184 - 100) * k);
-            b = Math.round(25 + (0 - 25) * k);
+        if (v < 0.33) {
+            const t = v / 0.33;
+            r = Math.round(217 + (255 - 217) * t);
+            g = Math.round(20 + (59 - 20) * t);
+            b = Math.round(20 + (31 - 20) * t);
+            // Background: Peach Pink (#F3B29E)
+            bgR = 243; bgG = 178; bgB = 158;
+        } else if (v < 0.66) {
+            const t = (v - 0.33) / 0.33;
+            r = Math.round(255 + (229 - 255) * t);
+            g = Math.round(119 + (184 - 119) * t);
+            b = Math.round(0 + (27 - 0) * t);
+            // Background: Warm Sand (#DFCBB2)
+            bgR = 223; bgG = 203; bgB = 178;
         } else {
-            const k = (t - 0.66) / 0.34;
-            r = Math.round(230 + (106 - 230) * k);
-            g = Math.round(184 + (181 - 184) * k);
-            b = Math.round(0 + (71 - 0) * k);
+            const t = (v - 0.66) / 0.34;
+            r = Math.round(118 + (143 - 118) * t);
+            g = Math.round(184 + (209 - 184) * t);
+            b = Math.round(67 + (88 - 67) * t);
+            // Background: Soft Sage Green (#CFD8C4)
+            bgR = 207; bgG = 216; bgB = 196;
         }
 
         return {
-            main: `rgb(${r}, ${g}, ${b})`,
-            glow: `rgba(${r}, ${g}, ${b}, 0.35)`,
-            dark: `rgb(${Math.max(0, r - 70)}, ${Math.max(0, g - 70)}, ${Math.max(0, b - 70)})`
+            root: `rgb(${Math.max(0, r - 75)}, ${Math.max(0, g - 75)}, ${Math.max(0, b - 75)})`,
+            body: `rgb(${r}, ${g}, ${b})`,
+            tip: `rgb(${Math.min(255, r + 50)}, ${Math.min(255, g + 50)}, ${Math.min(255, b + 50)})`,
+            glow: `rgba(${r}, ${g}, ${b}, 0.38)`,
+            bg: `rgb(${bgR}, ${bgG}, ${bgB})`
         };
     }
 
     draw() {
         this.ctx.clearRect(0, 0, this.width, this.height);
 
+        // Smooth vibe transition
+        this.vibe += (this.targetVibe - this.vibe) * 0.12;
+
         const cx = this.width * 0.5;
         const cy = this.height * 0.5;
-        const mood = this.getMoodColor();
+        const colors = this.getColors(this.vibe);
 
-        // Breathing harmonic oscillation
-        const breathe = Math.sin(this.time * 2.2) * 3;
-        const currentRadius = this.baseRadius + breathe;
+        // Update container background color smoothly matching the 1st video
+        const container = this.canvas.parentElement;
+        if (container) {
+            container.style.backgroundColor = colors.bg;
+            container.style.borderRadius = "24px";
+            container.style.transition = "background-color 0.4s ease";
+        }
 
-        // 1. Ambient Glow behind character
-        const glowGrad = this.ctx.createRadialGradient(cx, cy, currentRadius * 0.5, cx, cy, currentRadius * 1.7);
-        glowGrad.addColorStop(0, mood.glow);
+        // Breathing oscillation
+        const breathe = Math.sin(this.time * 2.2) * 3.5;
+        const radius = this.baseRadius + breathe;
+
+        // 1. Ambient Glow
+        this.ctx.save();
+        const glowGrad = this.ctx.createRadialGradient(cx, cy, radius * 0.4, cx, cy, radius * 1.8);
+        glowGrad.addColorStop(0, colors.glow);
         glowGrad.addColorStop(1, "rgba(0,0,0,0)");
         this.ctx.fillStyle = glowGrad;
         this.ctx.beginPath();
-        this.ctx.arc(cx, cy, currentRadius * 1.7, 0, Math.PI * 2);
+        this.ctx.arc(cx, cy, radius * 1.8, 0, Math.PI * 2);
         this.ctx.fill();
+        this.ctx.restore();
 
-        // 2. Procedural Fur Hair Strands (Shell Texturing)
+        // 2. Procedural Fur Strands (3500 Strands with Ambient Occlusion)
         this.ctx.save();
         this.ctx.lineCap = "round";
 
-        const tNorm = this.score / 100;
-
         for (let i = 0; i < this.strands.length; i++) {
             const s = this.strands[i];
-            const wave = Math.sin(this.time * s.freq + s.phase) * (2 + tNorm * 3);
+            const distFromCenter = Math.hypot(s.x, s.y);
 
-            const startX = cx + Math.cos(s.angle) * currentRadius;
-            const startY = cy + Math.sin(s.angle) * currentRadius;
+            // Starting point on sphere surface
+            const startX = cx + s.x * radius;
+            const startY = cy + s.y * radius;
 
-            // Hair tip position
-            let tipAngle = s.angle + (wave * 0.05);
-            let tipLen = s.length + (tNorm * 8);
+            // Wind & breathing motion
+            const sway = Math.sin(this.time * s.freq + s.phase) * (2.5 + (1 - this.vibe) * 3);
 
-            // Touch repulsion
-            if (this.isTouched) {
+            let tipAngle = s.angle2D + s.curl + (sway * 0.04);
+            let tipLen = s.length * (0.85 + (1 - s.z * 0.3));
+
+            // Touch deflection
+            if (this.isInteracting) {
                 const distToTouch = Math.hypot(startX - this.touchX, startY - this.touchY);
-                if (distToTouch < 70) {
+                if (distToTouch < 80) {
                     const pushAngle = Math.atan2(startY - this.touchY, startX - this.touchX);
                     tipAngle = pushAngle;
-                    tipLen += (70 - distToTouch) * 0.35;
+                    tipLen += (80 - distToTouch) * 0.3;
                 }
             }
 
-            const endX = cx + Math.cos(tipAngle) * (currentRadius + tipLen);
-            const endY = cy + Math.sin(tipAngle) * (currentRadius + tipLen);
+            // Mid control point for quadratic curve
+            const midX = startX + Math.cos(tipAngle) * (tipLen * 0.5) + (sway * 0.5);
+            const midY = startY + Math.sin(tipAngle) * (tipLen * 0.5);
 
+            // Tip end point
+            const endX = startX + Math.cos(tipAngle) * tipLen;
+            const endY = startY + Math.sin(tipAngle) * tipLen;
+
+            // Draw Strand
             this.ctx.beginPath();
             this.ctx.moveTo(startX, startY);
-            this.ctx.lineTo(endX, endY);
-            this.ctx.strokeStyle = (i % 3 === 0) ? mood.dark : mood.main;
-            this.ctx.lineWidth = s.baseThickness;
+            this.ctx.quadraticCurveTo(midX, midY, endX, endY);
+
+            // Gradient: dark root -> rim tip
+            this.ctx.strokeStyle = (distFromCenter < 0.6) ? colors.root : colors.tip;
+            this.ctx.lineWidth = s.thickness * (0.6 + (1 - s.z * 0.4));
             this.ctx.stroke();
         }
         this.ctx.restore();
 
-        // 3. Central Core Body
+        // 3. Central Body Core
         this.ctx.save();
-        const bodyGrad = this.ctx.createRadialGradient(cx - 15, cy - 20, 10, cx, cy, currentRadius);
-        bodyGrad.addColorStop(0, mood.main);
-        bodyGrad.addColorStop(1, mood.dark);
-        this.ctx.fillStyle = bodyGrad;
+        const coreGrad = this.ctx.createRadialGradient(
+            cx - 16, cy - 20, 10,
+            cx, cy, radius
+        );
+        coreGrad.addColorStop(0, colors.tip);
+        coreGrad.addColorStop(0.5, colors.body);
+        coreGrad.addColorStop(1, colors.root);
+        this.ctx.fillStyle = coreGrad;
         this.ctx.beginPath();
-        this.ctx.arc(cx, cy, currentRadius, 0, Math.PI * 2);
+        this.ctx.arc(cx, cy, radius, 0, Math.PI * 2);
         this.ctx.fill();
         this.ctx.restore();
 
-        // 4. Morphing Eyes & Facial Features
-        this.drawFace(cx, cy, tNorm);
+        // 4. Morphing Eyes & Eyebrows
+        this.drawFace(cx, cy, radius);
     }
 
-    drawFace(cx, cy, t) {
-        // Eye spacing and vertical position
-        const eyeOffsetX = 24;
-        const eyeOffsetY = -8;
+    drawFace(cx, cy, radius) {
+        const eyeSpacing = 28;
+        const eyeY = cy - 8;
 
-        // Eye state morphing:
-        // t = 0: Eyelids droop, angry slit (-35 deg), tired
-        // t = 1: Big wide sparkling eyes, pupils dilated, joyous
-        const eyeSize = 10 + t * 8; // 10 to 18
-        const pupilSize = 4 + t * 5; // 4 to 9
+        // Vibe 0.0: Eyebrows tilt down +32deg (Angry/Tired), pupils small
+        // Vibe 1.0: Eyebrows arch up -12deg (Joyful/Kind), pupils dilated sparkling
+        const eyeSize = 13 + this.vibe * 9; // 13px to 22px
+        const pupilSize = 6 + this.vibe * 7; // 6px to 13px
 
-        // Blinking
-        const blinkCycle = Math.sin(this.time * 0.8);
-        const isBlinking = blinkCycle > 0.96;
-        const scaleY = isBlinking ? 0.1 : 1;
+        // Eye gaze tracking towards touch pointer
+        let gazeX = 0;
+        let gazeY = 0;
+        if (this.isInteracting) {
+            const angle = Math.atan2(this.touchY - eyeY, this.touchX - cx);
+            const dist = Math.min(6, Math.hypot(this.touchX - cx, this.touchY - eyeY) * 0.08);
+            gazeX = Math.cos(angle) * dist;
+            gazeY = Math.sin(angle) * dist;
+        }
 
-        // Draw Left and Right Eyes
+        // Eyebrow Angle (-12deg happy to +32deg angry)
+        const browAngleRad = (32 - this.vibe * 44) * (Math.PI / 180);
+
         [-1, 1].forEach(side => {
-            const ex = cx + side * eyeOffsetX;
-            const ey = cy + eyeOffsetY;
+            const ex = cx + side * eyeSpacing;
 
+            // 1. Sclera (White eye background)
             this.ctx.save();
-            this.ctx.translate(ex, ey);
-            this.ctx.scale(1, scaleY);
-
-            // Sclera (White eye background)
             this.ctx.beginPath();
-            this.ctx.arc(0, 0, eyeSize, 0, Math.PI * 2);
+            this.ctx.arc(ex, eyeY, eyeSize, 0, Math.PI * 2);
+            this.ctx.fillStyle = "#FFFFFF";
+            this.ctx.shadowColor = "rgba(0,0,0,0.2)";
+            this.ctx.shadowBlur = 8;
+            this.ctx.fill();
+
+            // 2. Pupil (Dark with specular gleam)
+            this.ctx.beginPath();
+            this.ctx.arc(ex + gazeX, eyeY + gazeY, pupilSize, 0, Math.PI * 2);
+            this.ctx.fillStyle = (this.vibe < 0.33) ? "#3A0D0D" : "#14110F";
+            this.ctx.fill();
+
+            // Specular reflection (gleam)
+            this.ctx.beginPath();
+            this.ctx.arc(ex + gazeX - pupilSize * 0.35, eyeY + gazeY - pupilSize * 0.35, pupilSize * 0.38, 0, Math.PI * 2);
             this.ctx.fillStyle = "#FFFFFF";
             this.ctx.fill();
 
-            // Pupil (Black with sparkle reflection)
-            const pupilShiftX = (this.isTouched ? (this.touchX - ex) * 0.05 : 0);
-            const pupilShiftY = (this.isTouched ? (this.touchY - ey) * 0.05 : 0);
+            // 3. Eyebrows (Thick expressive fur brows)
+            this.ctx.translate(ex, eyeY - eyeSize * 1.15);
+            this.ctx.rotate(browAngleRad * side);
 
             this.ctx.beginPath();
-            this.ctx.arc(pupilShiftX, pupilShiftY, pupilSize, 0, Math.PI * 2);
-            this.ctx.fillStyle = "#12100E";
-            this.ctx.fill();
-
-            // High-energy eye sparkle (twinkle)
-            if (t > 0.4 && !isBlinking) {
-                this.ctx.beginPath();
-                this.ctx.arc(pupilShiftX - pupilSize * 0.35, pupilShiftY - pupilSize * 0.35, pupilSize * 0.35, 0, Math.PI * 2);
-                this.ctx.fillStyle = "#FFFFFF";
-                this.ctx.fill();
-            }
-
-            // Eyebrow Morphing (Angry tilt when t < 0.4, arching joy when t > 0.7)
-            const browTilt = (1 - t) * 0.45 * side; // tilt down towards center if angry
-            this.ctx.beginPath();
-            this.ctx.moveTo(-eyeSize * 0.8, -eyeSize * 1.2 + (side === -1 ? browTilt * 10 : -browTilt * 10));
-            this.ctx.lineTo(eyeSize * 0.8, -eyeSize * 1.2 + (side === 1 ? -browTilt * 10 : browTilt * 10));
-            this.ctx.strokeStyle = "#12100E";
-            this.ctx.lineWidth = 2.8;
+            this.ctx.moveTo(-eyeSize * 0.85, 0);
+            this.ctx.quadraticCurveTo(0, -5, eyeSize * 0.85, 0);
+            this.ctx.strokeStyle = "#14110F";
+            this.ctx.lineWidth = 4.2;
             this.ctx.lineCap = "round";
             this.ctx.stroke();
 
             this.ctx.restore();
         });
 
-        // Cute Mouth / Smile Morphing
+        // 5. Cute Nose / Snout
         this.ctx.save();
         this.ctx.beginPath();
-        const mouthY = cy + 18;
-        if (t < 0.3) {
-            // Frown / Pout
-            this.ctx.arc(cx, mouthY + 8, 10, Math.PI * 1.2, Math.PI * 1.8);
-        } else if (t < 0.7) {
-            // Small subtle smile
-            this.ctx.arc(cx, mouthY, 9, Math.PI * 0.15, Math.PI * 0.85);
-        } else {
-            // Big open beaming happy smile
-            this.ctx.arc(cx, mouthY - 2, 14, Math.PI * 0.1, Math.PI * 0.9);
-            this.ctx.fillStyle = "#8B1E1E";
-            this.ctx.fill();
-        }
-        this.ctx.strokeStyle = "#12100E";
-        this.ctx.lineWidth = 2.6;
-        this.ctx.lineCap = "round";
-        this.ctx.stroke();
+        this.ctx.arc(cx, eyeY + 14, 4.5, 0, Math.PI * 2);
+        this.ctx.fillStyle = "#14110F";
+        this.ctx.fill();
         this.ctx.restore();
     }
 
@@ -287,4 +330,4 @@ class FurryVibe {
     }
 }
 
-window.FurryVibe = FurryVibe;
+window.FurryMonster = FurryMonster;

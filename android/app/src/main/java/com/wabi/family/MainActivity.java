@@ -8,27 +8,23 @@ import android.os.Bundle;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
-import android.webkit.WebResourceRequest;
-import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
-import androidx.webkit.WebViewAssetLoader;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * MainActivity for WABI.
- * High-performance edge-to-edge container with native JavaScript Bridge.
+ * MainActivity for WABI Family & Discipline.
+ * Uses file:///android_asset/www/index.html to ensure 100% offline & local asset reliability.
  */
 public class MainActivity extends AppCompatActivity {
 
@@ -36,7 +32,7 @@ public class MainActivity extends AppCompatActivity {
     private static MainActivity instance;
 
     private WebView webView;
-    private WebViewAssetLoader assetLoader;
+    private NativeBridge nativeBridge;
 
     public static MainActivity getInstance() {
         return instance;
@@ -92,7 +88,7 @@ public class MainActivity extends AppCompatActivity {
         webView = new WebView(this);
         setContentView(webView);
 
-        webView.setBackgroundColor(Color.parseColor("#12100E")); // Deep Warm Espresso
+        webView.setBackgroundColor(Color.parseColor("#12100E"));
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
 
         WebSettings ws = webView.getSettings();
@@ -101,24 +97,20 @@ public class MainActivity extends AppCompatActivity {
         ws.setDatabaseEnabled(true);
         ws.setAllowFileAccess(true);
         ws.setAllowContentAccess(true);
+        ws.setAllowFileAccessFromFileURLs(true);
+        ws.setAllowUniversalAccessFromFileURLs(true);
         ws.setMediaPlaybackRequiresUserGesture(false);
+        ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         ws.setUseWideViewPort(true);
         ws.setLoadWithOverviewMode(true);
         ws.setCacheMode(WebSettings.LOAD_DEFAULT);
 
-        // Native Bridge injection
-        webView.addJavascriptInterface(new FamilyBridge(this), "WabiBridge");
-
-        assetLoader = new WebViewAssetLoader.Builder()
-                .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
-                .build();
+        // NativeBridge exposed as both window.AndroidNative and window.WabiBridge
+        nativeBridge = new NativeBridge(this);
+        webView.addJavascriptInterface(nativeBridge, "AndroidNative");
+        webView.addJavascriptInterface(nativeBridge, "WabiBridge");
 
         webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                return assetLoader.shouldInterceptRequest(request.getUrl());
-            }
-
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
@@ -126,7 +118,8 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        webView.loadUrl("https://appassets.android.content/assets/index.html");
+        // Robust file URL loading from android_asset
+        webView.loadUrl("file:///android_asset/www/index.html");
     }
 
     private void requestNecessaryPermissions() {

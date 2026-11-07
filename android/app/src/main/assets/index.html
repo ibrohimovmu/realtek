@@ -3,229 +3,233 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Wabi — Oila & Intizom</title>
+    <title>Wabi — Oila &amp; Intizom</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-    <!-- 1. WELCOME SCREEN: "MEET WABI" LIQUID GLASS LENS SWIPE (2-VIDEO) -->
-    <div id="welcome-screen">
+    <!-- 1. ONBOARDING SCREEN: "MEET WABI" LIQUID GLASS LENS SWIPE (2-VIDEO) -->
+    <div id="onboarding-screen">
         <canvas id="lens-canvas"></canvas>
 
-        <div class="welcome-header">
-            <div class="welcome-brand">WABI FOCUS</div>
-            <div class="welcome-title">Oila &amp; Intizom</div>
-            <div class="welcome-subtitle">Ota-ona va farzandlar uchun aqlli tarbiya va diqqat ekotizimi</div>
+        <div class="onboarding-hero">
+            <div class="onboarding-badge">WABI PLATFORM</div>
+            <h1 class="onboarding-title">Yangi avlod oila va tarbiya tizimi</h1>
+            <p class="onboarding-desc">Oila &amp; Intizom platformasiga xush kelibsiz. Hayotingizni tartibga soling.</p>
         </div>
 
-        <div class="welcome-instruction">
-            ▲ LINZANI TEPAGA SURING ▲
-        </div>
-    </div>
-
-    <!-- 2. SETUP MODAL (ROLE SELECTION) -->
-    <div id="setup-modal">
-        <div class="setup-card">
-            <div class="welcome-brand">KIRISH</div>
-            <h2 style="font-size: 22px; font-weight: 800; margin-top: 4px;">Kim sifatida kirdingiz?</h2>
-
-            <div class="role-grid">
-                <div class="role-option selected" id="role-parent" onclick="selectRole('parent')">
-                    <div class="role-option-icon">👑</div>
-                    <div class="role-option-title">Ota-ona (Parent)</div>
-                </div>
-                <div class="role-option" id="role-kid" onclick="selectRole('kid')">
-                    <div class="role-option-icon">🧒</div>
-                    <div class="role-option-title">Farzand (Kid)</div>
-                </div>
-            </div>
-
-            <input type="text" id="input-user-name" class="setup-input" placeholder="Ismingiz (masalan: Nodira)">
-            <input type="text" id="input-family-code" class="setup-input" placeholder="6 xonali oila kodi (yoki yangi xona uchun bo'sh qoldiring)">
-
-            <button class="btn-primary" onclick="confirmSetup()">Boshlash</button>
+        <div id="onboarding-buttons">
+            <button class="btn-pill" onclick="startSetup('parent')">
+                <span>Ota-ona sifatida kirish</span>
+                <span class="btn-arrow-circle">→</span>
+            </button>
+            <button class="btn-pill" style="background: rgba(20, 17, 15, 0.08); color: #14110F; box-shadow: none;" onclick="startSetup('kid')">
+                <span>Farzand sifatida kirish</span>
+                <span class="btn-arrow-circle" style="background: #14110F; color: #FFF;">→</span>
+            </button>
         </div>
     </div>
 
-    <!-- 3. MAIN APPLICATION HEADER -->
+    <!-- 2. SETUP MODAL -->
+    <div id="role-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(18,16,14,0.96); backdrop-filter: blur(25px); z-index: 1200; align-items: center; justify-content: center; padding: 24px;">
+        <div class="luxury-card" style="width: 100%; max-width: 340px; text-align: center;">
+            <h3 style="font-size: 20px; font-weight: 800; margin-bottom: 8px;" id="modal-role-title">Ro'yxatdan o'tish</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 18px;">Ismingizni va oila ma'lumotlarini kiriting</p>
+
+            <input type="text" id="setup-name-input" class="chat-input" style="width: 100%; margin-bottom: 12px;" placeholder="Ismingiz (masalan: Nodira)">
+            <input type="text" id="setup-code-input" class="chat-input" style="width: 100%; margin-bottom: 18px;" placeholder="6 xonali oila kodi (ixtiyoriy)">
+
+            <button class="btn-pill" onclick="completeSetup()">
+                <span>Boshlash</span>
+                <span class="btn-arrow-circle">→</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 3. MAIN HEADER -->
     <header class="app-header">
-        <div class="header-family-info">
-            <div class="family-name-row">
-                <span class="family-title" id="header-family-name">Bizning Oila</span>
-                <span class="family-code-pill" id="header-family-code" onclick="copyFamilyCode()" title="Nusxalash uchun bosing">KOD: ......</span>
-            </div>
-            <div class="user-role-badge">
-                <span class="badge-dot"></span>
-                <span id="header-user-status">Yuklanmoqda...</span>
+        <div class="header-meta">
+            <span class="header-family-title" id="header-family-name">Bizning Oila</span>
+            <div class="header-sub-row">
+                <span class="header-code-tag" id="header-code-tag" onclick="copyFamilyCode()">KOD: ......</span>
+                <span class="header-user-badge" id="header-user-badge">Yuklanmoqda...</span>
             </div>
         </div>
         <div class="header-avatar" id="header-avatar">👑</div>
     </header>
 
-    <!-- 4. VIEW 1: HOME VIEW -->
-    <main id="view-home" class="view-container active">
-        <!-- NAMANGAN PRAYER TIMES WIDGET -->
-        <div class="glass-card">
-            <div class="card-title-row">
-                <div class="card-title">🕌 Namoz Vaqtlari</div>
-                <div class="card-badge">Namangan</div>
+    <!-- 4. TAB 1: ASOSIY (Boshqaruv & Intizom) -->
+    <main id="view-home" class="tab-view active">
+        <!-- Namangan Namoz Vaqtlari -->
+        <div class="luxury-card">
+            <div class="card-header-row">
+                <div class="card-header-title">🕌 Namoz Vaqtlari</div>
+                <div class="card-header-action" onclick="syncPrayerAlarms()">Budilniklarni yoqish</div>
             </div>
-            <div class="prayer-grid" id="prayer-grid">
-                <div class="prayer-item" id="p-fajr">
-                    <span class="prayer-name">Bomdod</span>
-                    <span class="prayer-time">05:15</span>
-                </div>
-                <div class="prayer-item" id="p-dhuhr">
-                    <span class="prayer-name">Peshin</span>
-                    <span class="prayer-time">12:20</span>
-                </div>
-                <div class="prayer-item" id="p-asr">
-                    <span class="prayer-name">Asr</span>
-                    <span class="prayer-time">15:45</span>
-                </div>
-                <div class="prayer-item" id="p-maghrib">
-                    <span class="prayer-name">Shom</span>
-                    <span class="prayer-time">17:35</span>
-                </div>
-                <div class="prayer-item" id="p-isha">
-                    <span class="prayer-name">Xufton</span>
-                    <span class="prayer-time">19:05</span>
-                </div>
+            <div class="prayer-timeline" id="prayer-timeline">
+                <div class="prayer-card"><span class="prayer-card-name">Bomdod</span><span class="prayer-card-time" id="t-fajr">05:15</span></div>
+                <div class="prayer-card"><span class="prayer-card-name">Peshin</span><span class="prayer-card-time" id="t-dhuhr">12:20</span></div>
+                <div class="prayer-card"><span class="prayer-card-name">Asr</span><span class="prayer-card-time" id="t-asr">15:45</span></div>
+                <div class="prayer-card"><span class="prayer-card-name">Shom</span><span class="prayer-card-time" id="t-maghrib">17:35</span></div>
+                <div class="prayer-card"><span class="prayer-card-name">Xufton</span><span class="prayer-card-time" id="t-isha">19:05</span></div>
             </div>
         </div>
 
-        <!-- REAL SCREEN TIME & APP USAGE WIDGET -->
-        <div class="glass-card">
-            <div class="card-title-row">
-                <div class="card-title">⏳ Bugungi Ekran Vaqti</div>
-                <div class="card-badge" id="usage-permission-btn" onclick="requestUsagePermission()">Ruxsat berish</div>
+        <!-- Ekran Vaqti & 10-Daqiqa Qoidasi -->
+        <div class="luxury-card">
+            <div class="card-header-row">
+                <div class="card-header-title">⏳ Bugungi Ekran Vaqti</div>
+                <div class="card-header-action" id="usage-perm-btn" onclick="requestPermission('usage_stats')">Ruxsat berish</div>
             </div>
-            <div id="usage-list">
+            <div id="home-usage-list">
                 <div style="font-size: 13px; color: var(--text-secondary); text-align: center; padding: 12px 0;">
-                    Haqiqiy ilovalar vaqti tekshirilmoqda...
+                    Ekran vaqti ma'lumotlari tahlil qilinmoqda...
                 </div>
             </div>
         </div>
 
-        <!-- QUICK HABITS SUMMARY -->
-        <div class="glass-card">
-            <div class="card-title-row">
-                <div class="card-title">🎯 Bugungi Vazifalar</div>
-                <div class="card-badge" onclick="switchTab('tasks')">Barchasi</div>
+        <!-- Kunlik Intizom Rejasi -->
+        <div class="luxury-card">
+            <div class="card-header-row">
+                <div class="card-header-title">🎯 Kunlik Intizom Rejasi</div>
+                <div class="card-header-action" onclick="addNewHabitPrompt()">+ Reja</div>
             </div>
-            <div id="quick-tasks-list">
-                <!-- Injected via JavaScript -->
-            </div>
+            <div id="home-habits-list"></div>
         </div>
     </main>
 
-    <!-- 5. VIEW 2: TASKS & HABITS VIEW -->
-    <section id="view-tasks" class="view-container">
-        <div class="glass-card">
-            <div class="card-title-row">
-                <div class="card-title">📋 Vazifalar &amp; Odatlar</div>
-                <button class="btn-primary" style="width: auto; padding: 8px 18px; font-size: 13px;" onclick="openNewTaskModal()">+ Yangi Vazifa</button>
-            </div>
-            <div id="full-tasks-list">
-                <!-- Injected via JavaScript -->
-            </div>
+    <!-- 5. TAB 2: TARBIYA ENSIKLOPEDIYASI -->
+    <section id="view-tarbiya" class="tab-view">
+        <div class="category-filter-chips" id="tarbiya-chips">
+            <div class="chip active" onclick="filterTarbiya('all')">Barchasi</div>
+            <div class="chip" onclick="filterTarbiya('yigit')">⚔️ Yigit Xarakteri</div>
+            <div class="chip" onclick="filterTarbiya('qiz')">🌸 Qiz Bola Tarbiyasi</div>
+            <div class="chip" onclick="filterTarbiya('ota-ona')">🏡 Ota-onalar</div>
+            <div class="chip" onclick="filterTarbiya('yosh')">🌱 Yosh Davrlari</div>
+            <div class="chip" onclick="filterTarbiya('vaziyat')">🧭 Vaziyatlar Simulyatori</div>
         </div>
+
+        <div id="tarbiya-topics-list"></div>
     </section>
 
-    <!-- 6. VIEW 3: 3D FURRY VIBE CHARACTER (1-VIDEO) -->
-    <section id="view-vibe" class="view-container">
-        <div class="glass-card" style="text-align: center;">
-            <div class="card-title-row" style="justify-content: center;">
-                <div class="card-title">✨ What's your vibe today?</div>
+    <!-- 6. TAB 3: VIBE (3D Paxmoq Personaj - 1-Video) -->
+    <section id="view-vibe" class="tab-view">
+        <div class="luxury-card" style="text-align: center;">
+            <div class="card-header-row" style="justify-content: center;">
+                <div class="card-header-title">✨ What's your vibe today?</div>
             </div>
             <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
-                Bugungi kayfiyatingizni belgilang — personaj o'zgaradi va oila a'zolaringizga ko'rinadi!
+                Drag to express how you feel
             </p>
 
-            <div class="vibe-canvas-wrapper">
+            <div class="furry-box" id="furry-container">
                 <canvas id="furry-canvas"></canvas>
             </div>
 
-            <div class="slider-container">
-                <input type="range" id="vibe-slider" class="vibe-slider" min="0" max="100" value="75">
-                <div class="slider-labels">
-                    <span>Charchadim / Jahl 🥱</span>
-                    <span>O'rtacha 😐</span>
-                    <span>A'lo / Energiya 🤩</span>
+            <div class="vibe-slider-wrapper">
+                <input type="range" id="vibe-slider" class="vibe-input-range" min="0" max="100" value="75">
+                <div class="vibe-labels-row">
+                    <span>Not great 🥱</span>
+                    <span>Amazing 🤩</span>
                 </div>
             </div>
 
-            <button class="btn-primary" style="margin-top: 16px;" onclick="saveCurrentVibe()">Vibe'ni Saqlash</button>
+            <button class="btn-pill" style="margin-top: 18px;" onclick="saveVibeScore()">
+                <span>Vibe'ni Saqlash</span>
+                <span class="btn-arrow-circle">✓</span>
+            </button>
         </div>
     </section>
 
-    <!-- 7. VIEW 4: FAMILY & APP LIMITS -->
-    <section id="view-family" class="view-container">
-        <div class="glass-card">
-            <div class="card-title-row">
-                <div class="card-title">👨‍👩‍👧 Oila A'zolari</div>
-                <div class="card-badge" onclick="copyFamilyCode()">Kodni ulashish</div>
+    <!-- 7. TAB 4: DARDKASH (Hissiy AI Do'st) -->
+    <section id="view-dardkash" class="tab-view">
+        <div class="luxury-card">
+            <div class="card-header-row">
+                <div class="card-header-title">🤝 Dardkash — Yaqin Do'stingiz</div>
+                <div class="card-header-action" onclick="clearDardkashChat()">Tozalash</div>
             </div>
-            <div id="family-members-list">
-                <!-- Injected via JavaScript -->
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                Charchoq, g'azab, hissiy bo'shliq yoki oilaviy holat haqida bemalol yozing.
+            </p>
+
+            <div class="chat-scroll-area" id="chat-messages"></div>
+
+            <div class="chat-input-bar">
+                <input type="text" id="chat-input" class="chat-input" placeholder="Dardingiz yoki savolingizni yozing..." onkeypress="handleChatKey(event)">
+                <button class="chat-send-btn" onclick="sendDardkashMessage()">➤</button>
             </div>
         </div>
+    </section>
 
-        <div class="glass-card">
-            <div class="card-title-row">
-                <div class="card-title">🛡️ Ilovalar Cheklovi (Limit)</div>
-                <div class="card-badge" id="accessibility-badge" onclick="requestAccessibilityPermission()">Himoya: O'chiq</div>
+    <!-- 8. TAB 5: OILA (Parent & Kids ulanish, Instagram blokatori) -->
+    <section id="view-oila" class="tab-view">
+        <div class="luxury-card">
+            <div class="card-header-row">
+                <div class="card-header-title">👨‍👩‍👧 Oila A'zolari &amp; Bog'lanish</div>
+                <div class="card-header-action" onclick="copyFamilyCode()">Kodni ulashish</div>
+            </div>
+            <div id="family-members-view"></div>
+        </div>
+
+        <div class="luxury-card">
+            <div class="card-header-row">
+                <div class="card-header-title">🛡️ Instagram &amp; Ilovalar Blokatori</div>
+                <div class="card-header-action" id="access-perm-btn" onclick="requestPermission('accessibility')">Himoya: O'chiq</div>
             </div>
             <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
-                Limitdan oshgan ilovalar (Instagram, o'yinlar) AccessibilityService orqali avtomatik bloklanadi.
+                10-Daqiqa qoidasi: Instagram, TikTok va o'yinlar belgilangan vaqt to'lishi bilan darhol yopiladi.
             </p>
-            <div id="app-limits-list">
-                <!-- Injected via JavaScript -->
-            </div>
+            <div id="app-limits-view"></div>
         </div>
     </section>
 
-    <!-- 8. MODAL: CREATE TASK -->
-    <div id="new-task-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); backdrop-filter: blur(20px); z-index: 1200; align-items: center; justify-content: center; padding: 20px;">
-        <div class="setup-card">
-            <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 14px;">Yangi Vazifa Qo'shish</h3>
-            <input type="text" id="task-title-input" class="setup-input" placeholder="Vazifa nomi (masalan: Matematika darsi)">
-            <input type="number" id="task-points-input" class="setup-input" placeholder="Mukofot balli (masalan: 50)" value="50">
-            <input type="text" id="task-deadline-input" class="setup-input" placeholder="Tugash vaqti (masalan: 19:00)" value="19:00">
-            <div style="display: flex; gap: 10px;">
-                <button class="btn-primary" style="background: rgba(255,255,255,0.08); color: #FFF;" onclick="closeNewTaskModal()">Bekor qilish</button>
-                <button class="btn-primary" onclick="submitNewTask()">Qo'shish</button>
-            </div>
+    <!-- 9. TOPIC READING MODAL -->
+    <div id="topic-modal">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <span class="topic-tag" id="modal-topic-tag">Kategoriya</span>
+            <button class="card-header-action" onclick="closeTopicModal()">✕ Yopish</button>
         </div>
+        <h2 style="font-size: 22px; font-weight: 800; color: var(--text-primary);" id="modal-topic-title">Mavzu</h2>
+        <div class="modal-content-area" id="modal-topic-content"></div>
+        <button class="btn-pill" style="margin-top: auto;" onclick="closeTopicModal()">
+            <span>Tushundim</span>
+            <span class="btn-arrow-circle">✓</span>
+        </button>
     </div>
 
-    <!-- 9. FLOATING PILL NAVIGATION BAR -->
-    <nav class="floating-nav">
-        <div class="nav-item active" id="nav-home" onclick="switchTab('home')">
-            <span class="nav-icon">🏠</span>
-            <span class="nav-label">Asosiy</span>
+    <!-- 10. FLOATING BOTTOM DOCK (5-TABS) -->
+    <nav class="floating-dock">
+        <div class="dock-item active" id="dock-home" onclick="navigateTab('home')">
+            <span class="dock-icon">🏠</span>
+            <span class="dock-label">Asosiy</span>
         </div>
-        <div class="nav-item" id="nav-tasks" onclick="switchTab('tasks')">
-            <span class="nav-icon">📋</span>
-            <span class="nav-label">Vazifalar</span>
+        <div class="dock-item" id="dock-tarbiya" onclick="navigateTab('tarbiya')">
+            <span class="dock-icon">📖</span>
+            <span class="dock-label">Tarbiya</span>
         </div>
-        <div class="nav-item" id="nav-vibe" onclick="switchTab('vibe')">
-            <span class="nav-icon">✨</span>
-            <span class="nav-label">Vibe</span>
+        <div class="dock-item" id="dock-vibe" onclick="navigateTab('vibe')">
+            <span class="dock-icon">✨</span>
+            <span class="dock-label">Vibe</span>
         </div>
-        <div class="nav-item" id="nav-family" onclick="switchTab('family')">
-            <span class="nav-icon">👨‍👩‍👧</span>
-            <span class="nav-label">Oila</span>
+        <div class="dock-item" id="dock-dardkash" onclick="navigateTab('dardkash')">
+            <span class="dock-icon">🤝</span>
+            <span class="dock-label">Dardkash</span>
+        </div>
+        <div class="dock-item" id="dock-oila" onclick="navigateTab('oila')">
+            <span class="dock-icon">👨‍👩‍👧</span>
+            <span class="dock-label">Oila</span>
         </div>
     </nav>
 
     <!-- SCRIPTS -->
-    <script src="js/supabase-client.js"></script>
-    <script src="js/wabi-lens.js"></script>
+    <script src="js/tarbiya-data.js"></script>
+    <script src="js/wabi-onboarding.js"></script>
     <script src="js/furry-vibe.js"></script>
+    <script src="js/dardkash-ai.js"></script>
+    <script src="js/family-sync.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
