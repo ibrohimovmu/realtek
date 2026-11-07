@@ -8,8 +8,8 @@ android {
         applicationId "com.wabi.family"
         minSdkVersion 26
         targetSdkVersion 35
-        versionCode 50
-        versionName "1.0.0-WABI"
+        versionCode 51
+        versionName "1.0.1-WABI"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
