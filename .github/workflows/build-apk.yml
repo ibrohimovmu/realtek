@@ -42,7 +42,13 @@ jobs:
       - name: Build AURA Music APK (API 26 - API 35)
         working-directory: android
         run: |
-          gradle assembleDebug --stacktrace
+          gradle assembleDebug --stacktrace > ../gradle-output.txt 2>&1 || true
+          cat ../gradle-output.txt | tail -n 60
+          if ! grep -q "BUILD SUCCESSFUL" ../gradle-output.txt; then
+            echo "=== DETAILED ERRORS ==="
+            grep -E -i "(error:|FAILURE|cannot find|unresolved)" ../gradle-output.txt -A 3 -B 1 || true
+            exit 1
+          fi
 
       - name: Package APK Files
         run: |
