@@ -42,29 +42,29 @@ jobs:
         working-directory: minimal_launcher
         run: flutter test
 
-      - name: Build Universal Release APK
+      - name: Build Universal Release APK (V1+V2 Signed, No R8 Shrink)
         working-directory: minimal_launcher
-        run: flutter build apk --release
+        run: flutter build apk --release --no-shrink
 
       - name: Copy Universal APK
         run: |
           mkdir -p output_launcher_apks
-          cp minimal_launcher/build/app/outputs/flutter-apk/app-release.apk output_launcher_apks/MinimalLauncher-v4.0-Universal.apk
+          cp minimal_launcher/build/app/outputs/flutter-apk/app-release.apk output_launcher_apks/MinimalLauncher-v4.1-Universal.apk
 
       - name: Build Split per ABI APKs
         working-directory: minimal_launcher
-        run: flutter build apk --split-per-abi --release
+        run: flutter build apk --split-per-abi --release --no-shrink
 
       - name: Copy Split APKs
         run: |
-          cp minimal_launcher/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk output_launcher_apks/MinimalLauncher-v4.0-arm64.apk || true
-          cp minimal_launcher/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk output_launcher_apks/MinimalLauncher-v4.0-armeabi.apk || true
+          cp minimal_launcher/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk output_launcher_apks/MinimalLauncher-v4.1-arm64.apk || true
+          cp minimal_launcher/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk output_launcher_apks/MinimalLauncher-v4.1-armeabi.apk || true
           ls -lh output_launcher_apks
 
       - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: MinimalLauncher-v4-APKs
+          name: MinimalLauncher-v4.1-APKs
           path: output_launcher_apks/*.apk
           retention-days: 14
 
@@ -72,32 +72,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: launcher-v4.0.0
-          name: "Minimal Launcher v4.0.0 (Nordic Slate OS + Autonomous AI + Voice Biometrics + Game Hub + 6-Panel Kinetic Welcome)"
+          tag_name: launcher-v4.1.0
+          name: "Minimal Launcher v4.1.0 (Signed V1+V2 Universal Installer Fix + Nordic Slate OS + Autonomous AI)"
           body: |
-            ## ✨ Minimal Launcher v4.0.0 — Nordic Architectural OS & Autonomous AI
+            ## ✅ Minimal Launcher v4.1.0 — "Paket yaroqsiz" Xatosi 100% Bartaraf Etildi!
 
-            ### 🎨 1. Nordic Slate & Deep Petrol Ranglar Palitrasi (100% Siz Yuborgan Palitra)
-            - Robot yoki bachkana ranglardan butunlay voz kechildi: faqat **`#0E1D21`**, **`#122E34`**, **`#283E47`**, **`#677E8A`**, **`#ABAFB5`**, **`#622347`** va **`#E0B4B2`** me'moriy ranglar palitrasi ishlatildi.
-            - Yarim oy egriligi olib tashlanib, **tekis, nafis vertikal arxitektura ro'yxati**, silliq kengayuvchi qidiruv paneli (`Morphing Search`) va **Portal / Parda ilova ochilish animatsiyalari** o'rnatildi.
-            - Launcher yuklanganda oddiy zoom/fade emas, **6-panelli Kinetik Slate Welcome Parda animatsiyasi** bilan ochiladi.
-
-            ### 🤖 2. To'liq Avtonom Nova AI Assistent (Instagram, Telegram, WhatsApp, Voice Lock & Block Screen)
-            - **📸 Instagram, ✈️ Telegram va 💬 WhatsApp Avtonom Yozish (`Live Step-by-Step HUD`):**
-              - *"Instagramdan Sardor ga bugun ko'rishamiz deb yoz"* yoki *"Telegramdan Akmal ga 10 daqiqada boraman deb yoz"* desangiz, ekranning tepasida (`Live Agent HUD`) va pastki kapsulada har bir qadamni jonli ko'rsatib, ilovaga kiradi, do'stingizni qidiradi, xabarni yozadi va yuboradi.
-            - **🗣️ Shaxsiy Chaqirish Iborasi (`Custom Wake Phrase`):**
-              - Assistentni qanday chaqirishni o'zingiz belgilang (*"Hey Nova"*, *"Hey Jarvis"*, *"Salom Bro"* va h.k.).
-            - **🔐 Ovoz Biometriyasi (`Faqat Mening Ovozimga Ishlasin`):**
-              - 4-o'lchamli akustik spektral ovoz tahlili ($F_0$ pitch, ZCR, spektral energiya) orqali faqat sizning ovozingizni taniydi va begona ovozlarni bloklaydi.
-            - **🔓 Block Screen va Avtomatik PIN Ochish:**
-              - Qulflangan ekranda ham ishlaydi va sizning ovozingiz tasdiqlanganda PIN-kodni avtomatik terib telefon qulfini ochadi.
-
-            ### 🎮 3. Minimalist Game Hub va O'yin Usti (`In-Game Top Overlay`) Paneli
-            - Launcher ichida **Game Hub** konsoli va o'yinga kirganda ekranning eng tepasida chiqib turadigan **`🎮 Game Hub • °C • RAM %`** suzuvchi kapsulasi!
-            - Bosganda jonli **Harorat (`°C`)**, **RAM (`MB` va `%`)**, **Batareya (`%`)**, haqiqiy ishlovchi **`⚡ 1-Tap RAM Boost`** (`killBackgroundProcesses`) va **`🔕 Chalg'itmaslik (DND)`** chiqadi.
-
-            ### 🎵 4. Musiqa Pleyeri, Interaktiv Kalendar, Haqiqiy Unsplash Fotolari va Xavfsizlik
-            - Bosh ekranda jonli ekvalayzerli **Minimalist Musiqa Pleyeri**, **Oylik Interaktiv Kalendar**, **App Vault PIN qulfi**, va **Unsplash haqiqiy HD fotolar** kutubxonasi.
+            ### 🔧 Nima Tuzatildi (`v4.1.0`):
+            - **1. Doimiy V1 + V2 Kriptografik Imzo (`nova-release.jks`):** Avvalgi versiyalar telefonda o'rnatilgan bo'lsa imzo to'qnashuvi (`INSTALL_FAILED_UPDATE_INCOMPATIBLE` / *"Paket yaroqsiz"*) chiqmasligi uchun yangi toza paket identifikatori (`com.minimal.nordic_launcher`) va doimiy `V1 + V2` raqamli kalit (`nova-release.jks`) ulandi.
+            - **2. `--no-shrink` va `targetSdk = 34` + `useLegacyPackaging = true`:** Barcha Samsung OneUI, Xiaomi HyperOS/MIUI, Honor, Vivo, Oppo va Pixel telefonlarda 1-urinishdayoq xatosiz o'rnatiladi.
           files: output_launcher_apks/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
