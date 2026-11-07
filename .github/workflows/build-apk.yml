@@ -43,10 +43,17 @@ jobs:
         working-directory: android
         run: |
           gradle assembleDebug --stacktrace > ../gradle-output.txt 2>&1 || true
-          cat ../gradle-output.txt | tail -n 60
-          if ! grep -q "BUILD SUCCESSFUL" ../gradle-output.txt; then
-            echo "=== DETAILED ERRORS ==="
-            grep -E -i "(error:|FAILURE|cannot find|unresolved)" ../gradle-output.txt -A 3 -B 1 || true
+
+      - name: Always Upload Gradle Output
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-output
+          path: gradle-output.txt
+
+      - name: Verify Build Succeeded
+        run: |
+          if ! grep -q "BUILD SUCCESSFUL" gradle-output.txt; then
+            echo "Gradle failed!"
             exit 1
           fi
 
