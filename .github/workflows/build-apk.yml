@@ -45,34 +45,33 @@ jobs:
 
       - name: Package APK Files
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk Nova-Overlay-v3.1.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk Nova-Overlay-v3.2.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk Nova-Jarvis.apk
 
-      - name: Upload Nova-Overlay-v3.1.apk Artifact
+      - name: Upload Nova-Overlay-v3.2.apk Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Nova-Overlay-v3.1-APK
+          name: Nova-Overlay-v3.2-APK
           path: |
-            Nova-Overlay-v3.1.apk
+            Nova-Overlay-v3.2.apk
             Nova-Jarvis.apk
           retention-days: 30
 
-      - name: Publish v3.1.0 to GitHub Releases
+      - name: Publish v3.2.0 to GitHub Releases
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: nova-overlay-v3.1.0
-          name: "NOVA v3.1.0 — 100% Native SpeechRecognizer + Edge Glow + Spring 3D Plasma Sphere"
+          tag_name: nova-overlay-v3.2.0
+          name: "NOVA v3.2.0 — Unblocked Native Mic & Multi-Engine SpeechRecognizer"
           make_latest: true
           body: |
-            ## 🌌 NOVA v3.1.0 (`Nova-Overlay-v3.1.apk` / `Nova-Jarvis.apk`)
+            ## 🌌 NOVA v3.2.0 (`Nova-Overlay-v3.2.apk` / `Nova-Jarvis.apk`)
 
-            - **100% Native Android `SpeechRecognizer` (`MainActivity.java`):** Orqa fondagi mikrofon band qilish olib tashlandi; real-vaqtda `window.onNativeSpeech(text, isFinal)` va `window.onVoiceLevel(rmsdB)` ishlaydi.
-            - **Zero Grey Box:** Zerikarli kulrang xato qutisi va ikkinchi klaviatura tugmasi butunlay olib tashlandi.
-            - **Spring Slide-Up + 4-Sided Edge Glow + 3D Liquid Plasma Sphere:** Ilova ochilganda 4 ta chet bo'ylab ko'k-firuza neon nur (Edge Glow) va pastdan `cubic-bezier(0.22, 1, 0.36, 1)` spring animatsiyasi bilan 3D Suyuq Plazma Sferasi suzib chiqadi.
-            - **Blur-Fade Jonli Yozuv & Glassmorphic AI Kapsula:** Gapirayotganda so'zlar sfera tepasida qutisiz, shaffof fonda neon-oq harflar bilan yoziladi; faqat AI javob berganda shaffof-shisha (dark glassmorphism) kapsula silliq kengayib ochiladi.
+            - **Unblocked Direct Mic Permissions:** Removed blocking SharedPreferences flag so RECORD_AUDIO is directly requested and granted on any device.
+            - **Google Recognition Service Engine Matcher:** Resolves Samsung Galaxy voice issue by auto-selecting Google Speech Engine (`com.google.android.googlequicksearchbox`) with multi-language fallback (`uz-UZ`, `ru-RU`, `en-US`).
+            - **Live Status Feedback:** Sleek pulsing hint *"Eshitmoqdaman..."* appears immediately so user always knows the mic is active; transitions seamlessly to blur-fade neon words as you speak.
           files: |
-            Nova-Overlay-v3.1.apk
+            Nova-Overlay-v3.2.apk
             Nova-Jarvis.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

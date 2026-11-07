@@ -8,8 +8,8 @@ android {
         applicationId "com.nova.jarvis"
         minSdkVersion 26
         targetSdkVersion 35
-        versionCode 25
-        versionName "3.1.0-NATIVE-SPEECH-PLASMA"
+        versionCode 30
+        versionName "3.2.0-SPEECH-ENGINE-FIX"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 

@@ -2,11 +2,11 @@
  * ============================================================================
  * NOVA — 100% NATIVE SPEECH + SPRING 3D LIQUID PLASMA ORB ENGINE (www/js/app.js)
  * ============================================================================
- * - 100% Native Android SpeechRecognizer via NovaBridge.startNativeListening("uz-UZ")
- *   (NO HTML5 webkitSpeechRecognition!)
+ * - 100% Native Android SpeechRecognizer with Google Engine preference
  * - Real-time callbacks invoked directly by MainActivity.java:
  *     * window.onNativeSpeech(text, isFinal)
  *     * window.onVoiceLevel(rmsdB)
+ *     * window.onSpeechState(state, info)
  * - Boxless Blur-Fade Neon-White Words while speaking (#live-speech-stream)
  * - Minimalist Dark Glassmorphic Capsule expands ONLY when AI responds (#ai-response-capsule)
  * - 60fps Additive-Blended 3D Liquid Plasma Sphere + 4-Sided Neon Edge Glow
@@ -58,7 +58,6 @@
       this.voiceEnergy = 0.08;
       this.smoothedEnergy = 0.08;
       this.phase = 0;
-      this.renderedWords = [];
       this.chatHistory = [];
       this.mistParticles = this._initMistParticles(95);
     }
@@ -76,8 +75,6 @@
 
     // ------------------------------------------------------------------------
     // 1. REAL-TIME NATIVE CALLBACKS FROM MainActivity.java
-    //    - window.onNativeSpeech(text, isFinal)
-    //    - window.onVoiceLevel(rmsdB)
     // ------------------------------------------------------------------------
     _bindGlobalNativeCallbacks() {
       window.onVoiceLevel = (rmsdB) => {
@@ -89,6 +86,18 @@
             'data-speaking-active',
             norm > 0.22 ? 'true' : 'false'
           );
+        }
+      };
+
+      window.onSpeechState = (state, info) => {
+        if (state === 'need_permission') {
+          this._showStatusHint('Mikrofon ruxsati kerak (bu yerga bosing)', true);
+        } else if (state === 'ready' || state === 'listening') {
+          const container = document.getElementById('live-speech-stream');
+          // If no words yet, show calm hint
+          if (container && !container.querySelector('.speech-word')) {
+            this._showStatusHint('Eshitmoqdaman...', false);
+          }
         }
       };
 
@@ -134,7 +143,7 @@
 
     startListening(keepCapsule = false) {
       if (!keepCapsule) {
-        // Keep screen clean
+        this._showStatusHint('Eshitmoqdaman...', false);
       }
       const bridge = window.NovaBridge || window.NovaNative;
       if (bridge && typeof bridge.startNativeListening === 'function') {
@@ -147,12 +156,34 @@
     // ------------------------------------------------------------------------
     // 2. BOXLESS BLUR-FADE WORD RENDERER & AI GLASS CAPSULE
     // ------------------------------------------------------------------------
+    _showStatusHint(text, isWarning) {
+      const container = document.getElementById('live-speech-stream');
+      if (!container) return;
+      container.innerHTML = '';
+      const hint = document.createElement('div');
+      hint.id = 'status-hint';
+      hint.className = 'status-hint' + (isWarning ? ' warning' : '');
+      hint.textContent = text;
+      if (isWarning) {
+        hint.onclick = () => {
+          const bridge = window.NovaBridge || window.NovaNative;
+          bridge?.requestPermissionByName?.('microphone');
+        };
+      }
+      container.appendChild(hint);
+    }
+
     _renderLiveWords(sentence) {
       const container = document.getElementById('live-speech-stream');
       if (!container) return;
 
+      // Remove hint if present
+      const hint = document.getElementById('status-hint');
+      if (hint) {
+        container.removeChild(hint);
+      }
+
       const words = sentence.split(/\s+/).filter(Boolean);
-      // Append or update words without re-creating existing word spans so animation is smooth
       for (let i = 0; i < words.length; i++) {
         if (i < container.children.length) {
           const existing = container.children[i];
@@ -232,7 +263,6 @@
         orbBtn.addEventListener('pointercancel', clearHold);
       }
 
-      // Tapping AI capsule also opens settings if desired or re-triggers listening
       const aiCapsule = document.getElementById('ai-response-capsule');
       if (aiCapsule) {
         aiCapsule.addEventListener('click', () => {

@@ -28,7 +28,6 @@ body {
 
 /* ============================================================================
  * 1. TOP TRANSPARENT DISMISS AREA (Reveals Launcher & Apps Behind)
- * Tapping anywhere outside the Orb dismisses the overlay.
  * ============================================================================ */
 #transparent-dismiss-zone {
   position: fixed;
@@ -104,8 +103,7 @@ body[data-speaking-active="true"] .neon-edge-border {
 }
 
 /* ============================================================================
- * 4. BOXLESS FLOATING NEON-WHITE LIVE SPEECH WORDS (Blur-Fade Animation)
- * Shown directly on the transparent background above the sphere while speaking!
+ * 4. BOXLESS FLOATING NEON-WHITE LIVE SPEECH WORDS / MINIMAL STATUS HINT
  * ============================================================================ */
 #live-speech-stream {
   max-width: 420px;
@@ -117,7 +115,71 @@ body[data-speaking-active="true"] .neon-edge-border {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
+  align-items: center;
   gap: 6px;
+}
+
+.status-hint {
+  font-size: 14.5px;
+  font-weight: 500;
+  color: rgba(224, 242, 254, 0.9);
+  letter-spacing: 0.3px;
+  text-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 15px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  pointer-events: auto;
+  cursor: pointer;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  animation: hintFadeIn 0.3s ease forwards;
+}
+
+.status-hint::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
+  animation: pulseDot 1.4s infinite ease-in-out alternate;
+}
+
+.status-hint.warning {
+  border-color: rgba(245, 158, 11, 0.45);
+  color: #fef3c7;
+}
+
+.status-hint.warning::before {
+  background: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+}
+
+@keyframes pulseDot {
+  from {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+}
+
+@keyframes hintFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .speech-word {
@@ -148,7 +210,6 @@ body[data-speaking-active="true"] .neon-edge-border {
 
 /* ============================================================================
  * 5. MINIMALIST DARK GLASSMORPHISM CAPSULE (ONLY EXPANDS WHEN AI RESPONDS!)
- * Hidden by default — zero grey box when launching or listening!
  * ============================================================================ */
 #ai-response-capsule {
   width: 100%;
@@ -196,7 +257,6 @@ body[data-speaking-active="true"] .neon-edge-border {
 
 /* ============================================================================
  * 6. 3D LIQUID PLASMA SPHERE (Spring Slide-Up cubic-bezier(0.22, 1, 0.36, 1))
- * Tap: Listen | 1s Long-Press: Open Settings & Permissions Sheet
  * ============================================================================ */
 #orb-spring-wrapper {
   position: relative;
@@ -246,7 +306,7 @@ body[data-speaking-active="true"] .neon-edge-border {
 }
 
 /* ============================================================================
- * 7. SETTINGS (⚙️) & PERMISSIONS BOTTOM-SHEET (Opened via Orb Long-Press)
+ * 7. SETTINGS & PERMISSIONS BOTTOM-SHEET
  * ============================================================================ */
 #settings-sheet-backdrop {
   position: fixed;
