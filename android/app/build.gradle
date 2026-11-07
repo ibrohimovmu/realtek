@@ -1,21 +1,27 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace "com.realstrike.ar"
-    compileSdkVersion 34
+    namespace "com.nova.jarvis"
+    compileSdkVersion 35
 
     defaultConfig {
-        applicationId "com.realstrike.ar"
-        minSdkVersion 24
-        targetSdkVersion 34
-        versionCode 2
-        versionName "1.1.0"
+        applicationId "com.nova.jarvis"
+        minSdkVersion 26
+        targetSdkVersion 35
+        versionCode 10
+        versionName "2.0.0-NOVA"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
+        debug {
+            minifyEnabled false
+            shrinkResources false
+        }
         release {
             minifyEnabled false
+            shrinkResources false
+            signingConfig signingConfigs.debug
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -30,11 +36,17 @@ android {
             assets.srcDirs = ['src/main/assets']
         }
     }
+
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging true
+        }
+    }
 }
 
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.11.0'
-    implementation 'androidx.core:core:1.12.0'
-    implementation 'androidx.webkit:webkit:1.10.0'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'androidx.core:core:1.13.1'
+    implementation 'androidx.webkit:webkit:1.11.0'
 }

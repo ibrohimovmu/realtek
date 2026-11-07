@@ -1,23 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#0D0F12"
-        android:pathData="M0,0h108v108h-108z"/>
-    <!-- Outer Target Ring -->
+        android:fillColor="#050314"
+        android:pathData="M0,0h108v108h-108z" />
     <path
-        android:strokeColor="#FF9800"
-        android:strokeWidth="3"
-        android:pathData="M54,24 A30,30 0 1,1 53.99,24"/>
-    <!-- Center Tactical Dot -->
+        android:fillColor="#00000000"
+        android:strokeColor="#0066FF"
+        android:strokeWidth="4.5"
+        android:pathData="M54,54m-32,0a32,32 0,1 1,64 0a32,32 0,1 1,-64 0" />
     <path
-        android:fillColor="#00E5FF"
-        android:pathData="M54,48 A6,6 0 1,1 53.99,48"/>
-    <!-- Crosshair Ticks -->
+        android:fillColor="#00000000"
+        android:strokeColor="#00F0FF"
+        android:strokeWidth="2.8"
+        android:pathData="M54,54m-24,0a24,24 0,1 1,48 0a24,24 0,1 1,-48 0" />
     <path
-        android:strokeColor="#FF9800"
-        android:strokeWidth="2"
-        android:pathData="M54,14 L54,28 M54,80 L54,94 M14,54 L28,54 M80,54 L94,54"/>
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,54m-4,0a4,4 0,1 1,8 0a4,4 0,1 1,-8 0" />
 </vector>

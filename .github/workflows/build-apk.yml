@@ -1,4 +1,4 @@
-name: Build RealStrike AR APK
+name: Build Nova-Jarvis APK
 
 on:
   push:
@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: 20
 
-      - name: Sync Offline Assets to Android Bundle
+      - name: Sync NOVA Zero-UI Assets to Android Bundle
         run: |
           npm run sync
 
@@ -33,46 +33,45 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Gradle
+      - name: Setup Gradle 8.7
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: 8.2.1
+          gradle-version: 8.7
 
-      - name: Build Debug APK
+      - name: Build Nova-Jarvis APK (API 26 - API 35)
         working-directory: android
         run: |
           gradle assembleDebug --stacktrace
 
-      - name: Rename APK for Clear Download
+      - name: Package Nova-Jarvis.apk
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk RealStrike-AR-v1.0.apk || true
+          cp android/app/build/outputs/apk/debug/app-debug.apk Nova-Jarvis.apk
 
-      - name: Upload APK Artifact
+      - name: Upload Nova-Jarvis.apk Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RealStrike-AR-debug
-          path: android/app/build/outputs/apk/debug/*.apk
-          retention-days: 14
+          name: Nova-Jarvis-APK
+          path: |
+            Nova-Jarvis.apk
+            android/app/build/outputs/apk/debug/*.apk
+          retention-days: 30
 
-      - name: Publish to GitHub Releases
+      - name: Publish Nova-Jarvis.apk to GitHub Releases
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.0
-          name: "RealStrike AR v1.0.0 — Standalone Laser Tag APK"
+          tag_name: nova-jarvis-v2.0.0
+          name: "NOVA (Nova-Jarvis.apk) v2.0.0 — Autonomous AI Assistant & Digital Twin"
           body: |
-            ## 🎯 RealStrike AR — Mustaqil Android Taktik AR Shooter (Laser Tag)
+            ## 🌌 NOVA (`Nova-Jarvis.apk`) — Zero-UI Autonomous AI & Digital Twin (API 26 – API 35)
 
-            Qimmatbaho VR ko'zoynaksiz, smartfon kamerasi orqali real hayotda do'stlar bilan o'ynaladigan AR Laser Tag / PUBG otishma o'yini.
-
-            ### 🚀 Imkoniyatlar:
-            - **100% Offline Standalone APK:** Hech qanday tashqi sayt yoki PWA ga ulanmagan.
-            - **0-Ping WebRTC P2P:** Bitta Wi-Fi yoki Hotspot tarmog'ida 2-5ms kechikish bilan o'ynash.
-            - **AR Viewfinder & CV Lock:** 60 FPS kamera, inson gavdasini aniqlash (`[TARGET LOCKED]`), nishon qizilga aylanishi.
-            - **Zarba va Vibratsiya:** O'q tekkan raqib telefoni titraydi, ekranda qon vinyetkasi va HP ketadi. Otuvchida PUBG "X" hitmarkeri.
-            - **PUBG Taktik Profil & Armory:** Bronze dan Conqueror gacha darajalar, M416, AKM va AWM snayperi.
+            - **Zero-UI 60/120 FPS Orb Engine:** 4 ta jonli FFT skin (`Nova Cyan Ring`, `Solar Eclipse`, `Quantum Particle Sphere`, `Violet Aura`) + Bixby-uslubidagi Compact Bottom Pill rejimi + 1.5s Long-Press / 2-barmoq swipe orqali ochiluvchi yashirin **Nova Studio**.
+            - **Voice Biometrics & Anti-Bixby Semantic VAD:** 3 namuna orqali ovoz egasini tanish + gap bog'lovchilar bilan (`va`, `keyin`, `yani`, `lekin`, `haligi...`) tugaganda 3.8 soniyagacha fikr tugashini kutish.
+            - **Lock-Screen Auto-Unlock Engine:** Ekran qulflangan paytda "Hey Nova, qulfni och" buyrug'i orqali PIN/parolni avtomatik terib ochish.
+            - **6-Gudok Call Secretary & Relationship Matrix:** 6 ta chaqiruvdan so'ng 7-gudokda avtomatik ko'tarib, Ota-Ona/Bobo-Buviga sizlab va ehtirom bilan, Ustozga rasmiy, Do'stlarga samimiy `"bro"` ohangida, Begonaga tekshiruvchi ohangda jonli gaplashish va yozib olish.
+            - **Telegram Plus (`org.telegram.plus`) & Ghost Twin:** Orqa fonda Notification `RemoteInput`, Accessibility UI avto-yozish va MTProto Userbot.
+            - **Focus Guardian & 5-Mahal Namoz Budilnigi:** Instagramda 10 daqiqadan ko'p o'tirilsa ovozli ogohlantirish bilan yopish va 30 daqiqa bloklash + 5 mahal namoz vaqtlariga avtomatik tizim budilnigi (`EXTRA_SKIP_UI`).
           files: |
-            RealStrike-AR-v1.0.apk
-            android/app/build/outputs/apk/debug/app-debug.apk
+            Nova-Jarvis.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

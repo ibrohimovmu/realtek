@@ -1,7 +1,7 @@
 {
-  "name": "realstrike-ar",
-  "version": "1.0.0",
-  "description": "RealStrike AR - Autonomous Android Tactical AR Laser Tag Shooter",
+  "name": "nova-jarvis-os",
+  "version": "2.0.0",
+  "description": "NOVA (Nova-Jarvis.apk) — Zero-UI Autonomous Android AI Assistant & Digital Twin (API 26 - API 35)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -9,14 +9,15 @@
     "build:apk": "node scripts/sync-assets.js && cd android && ./gradlew assembleDebug"
   },
   "keywords": [
-    "augmented-reality",
-    "laser-tag",
-    "fps",
-    "pubg",
-    "webrtc",
-    "computer-vision",
+    "nova",
+    "jarvis",
+    "digital-twin",
+    "zero-ui",
+    "voice-biometrics",
+    "semantic-vad",
+    "telegram-plus",
     "android"
   ],
-  "author": "RealStrike Tactical Systems",
+  "author": "NOVA Autonomous Systems",
   "license": "MIT"
 }
