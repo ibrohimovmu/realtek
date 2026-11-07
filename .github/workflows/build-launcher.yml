@@ -49,7 +49,7 @@ jobs:
       - name: Copy Universal APK
         run: |
           mkdir -p output_launcher_apks
-          cp minimal_launcher/build/app/outputs/flutter-apk/app-release.apk output_launcher_apks/MinimalLauncher-Universal.apk
+          cp minimal_launcher/build/app/outputs/flutter-apk/app-release.apk output_launcher_apks/MinimalLauncher-v2.0-Universal.apk
 
       - name: Build Split per ABI APKs
         working-directory: minimal_launcher
@@ -57,14 +57,14 @@ jobs:
 
       - name: Copy Split APKs
         run: |
-          cp minimal_launcher/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk output_launcher_apks/MinimalLauncher-arm64.apk || true
-          cp minimal_launcher/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk output_launcher_apks/MinimalLauncher-armeabi.apk || true
+          cp minimal_launcher/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk output_launcher_apks/MinimalLauncher-v2.0-arm64.apk || true
+          cp minimal_launcher/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk output_launcher_apks/MinimalLauncher-v2.0-armeabi.apk || true
           ls -lh output_launcher_apks
 
       - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: MinimalLauncher-APKs
+          name: MinimalLauncher-v2-APKs
           path: output_launcher_apks/*.apk
           retention-days: 14
 
@@ -72,19 +72,22 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: launcher-v1.0.0
-          name: "Minimal Launcher v1.0.0 (Aesthetic & Interactive)"
+          tag_name: launcher-v2.0.0
+          name: "Minimal Launcher v2.0.0 (Yarim Oy, AI Fonlar, Faollik Tarixi & Haqiqiy Mushukcha)"
           body: |
-            ## 📱 Minimal Launcher — Android Home Launcher
+            ## 🌙 Minimal Launcher v2.0.0 — Katta Yangilanish
 
-            Foydalanuvchi iltimosiga asosan Niagara Launcher zaifliklari bartaraf etilgan, estetik minimalist va jonli animatsiyalarga boy yangi launcher.
+            Foydalanuvchi talablari asosida tubdan boyitilgan, yarim oy shaklida aylanuvchi va to'liq moslashtiriluvchi (customizable) Android Launcher.
 
-            ### ✨ Asosiy imkoniyatlar:
-            - **Estetik Minimalist Dizayn:** Chiroyli adaçayı kulrang (`#AFBABA`) fon, katta raqamli soat, gorizontal haftalik lenta va qora doira shaklidagi ilova piktogrammalari.
-            - **Interaktiv Qora Mushuk:** O'ng chekkada mo'ralab turadigan, ko'zlarini miltillatuvchi, barmoq teginishiga qarab qaraydigan va teginilganda yashirinuvchi yoqimli mushukcha animatsiyasi.
-            - **Atrof-muhit Zarrachalari:** Sekin suzuvchi chang motlari va barmoq tekkan joyda yumshoq to'lqinlar.
-            - **Erkin Qidiruv (Niagara kamchiligi yo'q):** Qat'iy alifbo qatori o'rniga qulay qidiruv paneli va tezkor ilovalar tortmasi (harf boshlari va so'zlar bo'yicha qidiruv).
-            - **To'liq Mahalliy & Xavfsiz:** Hech qanday og'ir kutubxonalarsiz, toza Android `PackageManager` va Flutter orqali chaqmoqdek tez ochiladi va qotmaydi.
+            ### ✨ Yangi imkoniyatlar (v2.0.0):
+            - **🌙 Yarim Oy (Crescent Arc) Aylanma Menyu:** Pastdan chiqadigan oyna o'rniga asosiy ekranning o'zida yarim oy shaklida silliq aylanadigan ilovalar g'ildiragi (`Hammasi`, `Asosiy ★`, `Oxirgi 🕒`, `Ko'p kirilgan 🔥` filtrlari va tezkor qidiruv bilan).
+            - **🐈‍⬛ Kichikroq va Haqiqiy Qora Mushukcha:** Tabiiy mushuk anatomiyasi, vertikal qorachiqli qahrabo/zumrad/oq ko'zlar, barmoq harakatini kuzatish, o'lchamini va ko'z rangini o'zgartirish imkoniyati.
+            - **📊 Faollik va Kirilgan Ilovalar Tarixi Markazi:** Qaysi ilovaga soat nechada kirilganligi (Timeline), eng ko'p ishlatilgan ilovalar statistikasi, ekran vaqti (`UsageStatsManager`), Maxfiy (Incognito) rejim va Yashirin ilovalar ombori.
+            - **🎨 4-Bo'limli Shaxsiylashtirish Studiyasi:**
+              - **6 xil Kreativ HD Orqa Fon** + **AI Orqa Fon Yaratuvchi** + **Galereyadan rasm tanlash** + **6 xil 60fps Jonli San'at sahnasi**.
+              - **6 xil Soat uslubi** (`Minimal Klassik`, `3D Flip Soat`, `Bauhaus Analog`, `Katta Vertikal`, `Kiber HUD`, `Shaffof Kapsula`).
+              - **6 xil Ikonka uslubi** (`Qora Doira`, `Muzlatilgan Oyna`, `Neon Halqa`, `Tabiiy Rangli`, `Oq-Qora`, `Faqat Yozuv`).
+              - **7 xil Atrof-muhit Effekti** (`Chang`, `Tungi Qo'ng'izlar`, `Sakura`, `Kosmos`, `Qor`, `Matrix`).
           files: output_launcher_apks/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
