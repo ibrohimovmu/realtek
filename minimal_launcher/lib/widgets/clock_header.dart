@@ -1,621 +1,548 @@
 import 'dart:async';
-import 'dart:math';
-import 'dart:ui';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/app_info.dart';
 import '../services/launcher_store.dart';
 
-/// Multi-style Clock & Home Widget Header supporting 6 distinct clock aesthetics
-/// plus optional System Pulse (Battery/RAM) and Daily Focus Note widgets.
 class ClockHeader extends StatefulWidget {
-  final Color ink;
-  final Color muted;
-  final VoidCallback? onTapClock;
+  final LauncherStore store;
 
-  const ClockHeader({
-    super.key,
-    required this.ink,
-    required this.muted,
-    this.onTapClock,
-  });
+  const ClockHeader({super.key, required this.store});
 
   @override
   State<ClockHeader> createState() => _ClockHeaderState();
 }
 
-class _ClockHeaderState extends State<ClockHeader> with TickerProviderStateMixin {
-  late DateTime _now;
-  Timer? _timer;
-  late final AnimationController _intro;
-  late final AnimationController _pulse;
+class _ClockHeaderState extends State<ClockHeader>
+    with SingleTickerProviderStateMixin {
+  late Timer _timer;
+  DateTime _now = DateTime.now();
+  bool _isEditingNote = false;
+  late TextEditingController _noteController;
+  late AnimationController _waveCtrl;
+  bool _musicPlayingVisual = false;
+
+  static const _shortDays = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  static const _fullDays = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+  static const _uzMonths = [
+    'Yanvar',
+    'Fevral',
+    'Mart',
+    'Aprel',
+    'May',
+    'Iyun',
+    'Iyul',
+    'Avgust',
+    'Sentabr',
+    'Oktabr',
+    'Noyabr',
+    'Dekabr',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _now = DateTime.now();
-    _intro = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
-      ..forward();
-    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
+    _noteController = TextEditingController(text: widget.store.dailyNote);
+    _waveCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat(reverse: true);
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      final n = DateTime.now();
-      final minChanged = n.minute != _now.minute;
       if (mounted) {
-        setState(() => _now = n);
-        if (minChanged) _pulse.forward(from: 0);
+        setState(() => _now = DateTime.now());
       }
     });
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
-    _intro.dispose();
-    _pulse.dispose();
+    _timer.cancel();
+    _waveCtrl.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
-  Animation<double> _interval(double a, double b) =>
-      CurvedAnimation(parent: _intro, curve: Interval(a, b, curve: Curves.easeOutCubic));
+  String _formatHour() {
+    int h = _now.hour;
+    if (!widget.store.use24HourFormat) {
+      h = h % 12;
+      if (h == 0) h = 12;
+    }
+    return h.toString().padLeft(2, '0');
+  }
+
+  String _formatMinute() => _now.minute.toString().padLeft(2, '0');
 
   @override
   Widget build(BuildContext context) {
-    final store = LauncherStore.i;
+    final store = widget.store;
+    final fg = store.foregroundColor;
+    final sub = store.subtleTextColor;
+    final scale = store.clockScale;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () {
-            HapticFeedback.selectionClick();
-            if (widget.onTapClock != null) {
-              widget.onTapClock!();
-            } else {
-              // Cycle to next clock style on double/quick tap if desired
-              final nextIdx = (store.clockStyle.index + 1) % ClockStyle.values.length;
-              store.setClockStyle(ClockStyle.values[nextIdx]);
-            }
-          },
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 380),
-            child: _buildSelectedClock(store.clockStyle, store),
-          ),
-        ),
+        // Main Clock Display
+        switch (store.clockStyle) {
+          ClockStyle.editorialRibbon => _buildEditorialRibbon(fg, sub, scale),
+          ClockStyle.bauhausSplit => _buildBauhausSplit(fg, sub, scale),
+          ClockStyle.neonMatrix => _buildNordicSlateMatrix(fg, sub, scale),
+          ClockStyle.minimalZen => _buildMinimalZen(fg, sub, scale),
+          ClockStyle.analogChrono => _buildAnalogChrono(fg, sub, scale),
+        },
 
-        // Optional System Telemetry Pulse Pill (Battery + RAM)
-        if (store.showSystemPulse && store.clockStyle != ClockStyle.cyber) ...[
-          const SizedBox(height: 8),
-          _buildSystemPulsePill(store),
+        // Status & Weather / Battery / Temp Pill Row
+        if (store.showStatusPill || store.showDailyNoteWidget) ...[
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              alignment: WrapAlignment.center,
+              children: [
+                if (store.showStatusPill) _buildTelemetryPill(store, fg, sub),
+                if (store.showDailyNoteWidget) _buildDailyNotePill(store, fg, sub),
+              ],
+            ),
+          ),
         ],
 
-        // Optional Daily Focus / Quick Note Widget
-        if (store.showQuickNote) ...[
-          const SizedBox(height: 6),
-          _buildQuickNotePill(context, store),
+        // Minimalist Music Player Strip + Interactive Calendar Trigger
+        if (store.showMusicWidget || store.showCalendarWidget) ...[
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              children: [
+                if (store.showMusicWidget)
+                  Expanded(child: _buildMinimalMusicBar(store, fg, sub)),
+                if (store.showMusicWidget && store.showCalendarWidget)
+                  const SizedBox(width: 8),
+                if (store.showCalendarWidget)
+                  _buildCalendarQuickButton(store, fg, sub),
+              ],
+            ),
+          ),
         ],
       ],
     );
   }
 
-  Widget _buildSelectedClock(ClockStyle style, LauncherStore store) {
-    switch (style) {
-      case ClockStyle.reference:
-        return _buildReferenceClock();
-      case ClockStyle.flip:
-        return _buildFlipClock();
-      case ClockStyle.analog:
-        return _buildAnalogClock();
-      case ClockStyle.editorial:
-        return _buildEditorialClock();
-      case ClockStyle.cyber:
-        return _buildCyberClock(store);
-      case ClockStyle.glassPill:
-        return _buildGlassPillClock(store);
-    }
+  Widget _buildMinimalMusicBar(LauncherStore store, Color fg, Color sub) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0E1D21).withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF677E8A).withValues(alpha: 0.28),
+          width: 0.9,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Animated Slate Soundwave Equalizer
+          SizedBox(
+            width: 20,
+            height: 16,
+            child: AnimatedBuilder(
+              animation: _waveCtrl,
+              builder: (context, _) {
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: List.generate(4, (i) {
+                    final activeH = _musicPlayingVisual
+                        ? (4.0 +
+                            11.0 *
+                                (0.5 +
+                                    0.5 *
+                                        math.sin(
+                                          _waveCtrl.value * math.pi * 2 +
+                                              i * 1.3,
+                                        )))
+                        : 5.0 + (i.isEven ? 3.0 : 0.0);
+                    return Container(
+                      width: 3,
+                      height: activeH,
+                      decoration: BoxDecoration(
+                        color: _musicPlayingVisual
+                            ? const Color(0xFFE0B4B2)
+                            : const Color(0xFF677E8A),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    );
+                  }),
+                );
+              },
+            ),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              _musicPlayingVisual ? 'Media ijro etilmoqda' : 'Media pleyer',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFFABAFB5),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          _mediaIconBtn(
+            icon: Icons.skip_previous_rounded,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              store.mediaControl('previous');
+            },
+          ),
+          const SizedBox(width: 4),
+          _mediaIconBtn(
+            icon: _musicPlayingVisual
+                ? Icons.pause_rounded
+                : Icons.play_arrow_rounded,
+            highlight: true,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              setState(() => _musicPlayingVisual = !_musicPlayingVisual);
+              store.mediaControl('play_pause');
+            },
+          ),
+          const SizedBox(width: 4),
+          _mediaIconBtn(
+            icon: Icons.skip_next_rounded,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              store.mediaControl('next');
+            },
+          ),
+        ],
+      ),
+    );
   }
 
-  // 1. Reference Screenshot Clock (20:43 + wed thu fri Saturday + line & circle badge)
-  Widget _buildReferenceClock() {
-    final time = '${LauncherLogic.two(_now.hour)}:${LauncherLogic.two(_now.minute)}';
-    final strip = LauncherLogic.weekStrip(_now);
-    final today = LauncherLogic.weekdayFull[_now.weekday - 1];
+  Widget _mediaIconBtn({
+    required IconData icon,
+    required VoidCallback onTap,
+    bool highlight = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 26,
+        height: 26,
+        decoration: BoxDecoration(
+          color: highlight
+              ? const Color(0xFF677E8A).withValues(alpha: 0.35)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          icon,
+          size: 16,
+          color: const Color(0xFFABAFB5),
+        ),
+      ),
+    );
+  }
 
-    return Column(
-      key: const ValueKey('clock_ref'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        FadeTransition(
-          opacity: _interval(0.0, 0.5),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (var i = 0; i < time.length; i++)
-                _RollingChar(char: time[i], color: widget.ink, key: ValueKey('c$i')),
-            ],
+  Widget _buildCalendarQuickButton(LauncherStore store, Color fg, Color sub) {
+    final monthName = _uzMonths[_now.month - 1];
+    return GestureDetector(
+      onTap: () => _openFullCalendarModal(context, store),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0E1D21).withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFF677E8A).withValues(alpha: 0.28),
+            width: 0.9,
           ),
         ),
-        const SizedBox(height: 5),
-        FadeTransition(
-          opacity: _interval(0.25, 0.75),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              for (final d in strip.before) _day(d),
-              const SizedBox(width: 10),
-              Text(
-                today,
-                style: TextStyle(
-                  color: widget.muted,
-                  fontSize: 16.5,
-                  fontWeight: FontWeight.w400,
-                  letterSpacing: 0.2,
-                ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.calendar_today_rounded,
+              size: 13,
+              color: Color(0xFF677E8A),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '${_now.day} $monthName',
+              style: const TextStyle(
+                color: Color(0xFFABAFB5),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
               ),
-              const SizedBox(width: 10),
-              for (final d in strip.after) _day(d),
-            ],
-          ),
+            ),
+          ],
         ),
-        const SizedBox(height: 6),
-        SizedBox(
-          width: 310,
-          height: 22,
-          child: AnimatedBuilder(
-            animation: Listenable.merge([_intro, _pulse]),
-            builder: (context, _) {
-              final grow = _interval(0.4, 1.0).value;
-              final pulse = Curves.easeOut.transform(_pulse.value);
-              final badgeScale = 1.0 + 0.16 * (1 - (2 * pulse - 1).abs());
-              return Row(
-                children: [
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: FractionallySizedBox(
-                        widthFactor: grow,
-                        child: Container(height: 1, color: widget.muted.withValues(alpha: 0.55)),
+      ),
+    );
+  }
+
+  void _openFullCalendarModal(BuildContext context, LauncherStore store) {
+    HapticFeedback.lightImpact();
+    final firstDayOfMonth = DateTime(_now.year, _now.month, 1);
+    final daysInMonth = DateTime(_now.year, _now.month + 1, 0).day;
+    final startWeekday = firstDayOfMonth.weekday; // 1 = Mon .. 7 = Sun
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(22, 14, 22, 26),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0E1D21),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border.all(
+              color: const Color(0xFF677E8A).withValues(alpha: 0.30),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF677E8A).withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${_uzMonths[_now.month - 1].toUpperCase()} ${_now.year}',
+                      style: const TextStyle(
+                        color: Color(0xFFABAFB5),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 2.0,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Transform.scale(
-                    scale: grow * badgeScale,
-                    child: Container(
-                      width: 21,
-                      height: 21,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(color: widget.ink, shape: BoxShape.circle),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF122E34),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                       child: Text(
-                        LauncherLogic.two(_now.day),
-                        style: TextStyle(
-                          color: widget.ink.computeLuminance() > 0.5 ? Colors.black : Colors.white,
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
+                        'Bugun: ${_now.day}-${_uzMonths[_now.month - 1]}',
+                        style: const TextStyle(
+                          color: Color(0xFF677E8A),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: const ['DU', 'SE', 'CH', 'PA', 'JU', 'SH', 'YA']
+                      .map(
+                        (d) => SizedBox(
+                          width: 36,
+                          child: Center(
+                            child: Text(
+                              d,
+                              style: TextStyle(
+                                color: Color(0xFF677E8A),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+                const SizedBox(height: 8),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 7,
+                    mainAxisSpacing: 6,
+                    crossAxisSpacing: 6,
+                    childAspectRatio: 1.15,
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: FractionallySizedBox(
-                        widthFactor: grow,
-                        child: Container(height: 1, color: widget.muted.withValues(alpha: 0.55)),
+                  itemCount: (startWeekday - 1) + daysInMonth,
+                  itemBuilder: (context, idx) {
+                    if (idx < startWeekday - 1) {
+                      return const SizedBox.shrink();
+                    }
+                    final dayNum = idx - (startWeekday - 1) + 1;
+                    final isToday = dayNum == _now.day;
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: isToday
+                            ? const Color(0xFF677E8A)
+                            : const Color(0xFF122E34).withValues(alpha: 0.65),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  // 2. 3D Retro Mechanical Flip Clock
-  Widget _buildFlipClock() {
-    final hh = LauncherLogic.two(_now.hour);
-    final mm = LauncherLogic.two(_now.minute);
-    final ss = LauncherLogic.two(_now.second);
-    final today = LauncherLogic.weekdayFull[_now.weekday - 1];
-
-    return Column(
-      key: const ValueKey('clock_flip'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            _flipCard(hh),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 14),
-              child: Text(
-                ':',
-                style: TextStyle(color: widget.ink, fontSize: 28, fontWeight: FontWeight.bold),
-              ),
-            ),
-            _flipCard(mm),
-            const SizedBox(width: 6),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text(
-                ss,
-                style: TextStyle(
-                  color: widget.muted,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+                      child: Center(
+                        child: Text(
+                          '$dayNum',
+                          style: TextStyle(
+                            color: isToday
+                                ? const Color(0xFF0E1D21)
+                                : const Color(0xFFABAFB5),
+                            fontSize: 12.5,
+                            fontWeight:
+                                isToday ? FontWeight.w800 : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Text(
-          '${today.toUpperCase()}  •  ${LauncherLogic.two(_now.day)}.${LauncherLogic.two(_now.month)}.${_now.year}',
-          style: TextStyle(
-            color: widget.muted,
-            fontSize: 10.5,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1.6,
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 
-  Widget _flipCard(String digits) {
+  Widget _buildTelemetryPill(LauncherStore store, Color fg, Color sub) {
     return Container(
-      width: 68,
-      height: 58,
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFF1F2327),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.28),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Text(
-            digits,
-            style: const TextStyle(
-              color: Color(0xFFF3F4F6),
-              fontSize: 34,
-              fontWeight: FontWeight.w700,
-              fontFeatures: [FontFeature.tabularFigures()],
-            ),
-          ),
-          // Split-flap horizontal crease line
-          Container(
-            height: 1.2,
-            color: Colors.black.withValues(alpha: 0.55),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 3. Bauhaus Minimalist Analog Watch
-  Widget _buildAnalogClock() {
-    final today = LauncherLogic.weekdayShort[_now.weekday - 1].toUpperCase();
-    return Row(
-      key: const ValueKey('clock_analog'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: 78,
-          height: 78,
-          child: CustomPaint(
-            painter: _BauhausAnalogPainter(now: _now, ink: widget.ink, muted: widget.muted),
-          ),
+        color: const Color(0xFF0E1D21).withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFF677E8A).withValues(alpha: 0.25),
+          width: 0.8,
         ),
-        const SizedBox(width: 16),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '${LauncherLogic.two(_now.hour)}:${LauncherLogic.two(_now.minute)}',
-              style: TextStyle(
-                color: widget.ink,
-                fontSize: 28,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -0.5,
-              ),
-            ),
-            Text(
-              '$today, ${LauncherLogic.two(_now.day)}-${LauncherLogic.two(_now.month)}',
-              style: TextStyle(
-                color: widget.muted,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 1.1,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // 4. Giant Editorial Stacked Clock
-  Widget _buildEditorialClock() {
-    final hh = LauncherLogic.two(_now.hour);
-    final mm = LauncherLogic.two(_now.minute);
-    final today = LauncherLogic.weekdayFull[_now.weekday - 1];
-
-    return Row(
-      key: const ValueKey('clock_editorial'),
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              hh,
-              style: TextStyle(
-                color: widget.ink,
-                fontSize: 38,
-                fontWeight: FontWeight.w800,
-                height: 0.92,
-                letterSpacing: -1,
-              ),
-            ),
-            Text(
-              mm,
-              style: TextStyle(
-                color: widget.ink.withValues(alpha: 0.55),
-                fontSize: 38,
-                fontWeight: FontWeight.w300,
-                height: 0.95,
-                letterSpacing: -1,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(width: 14),
-        Container(width: 1.5, height: 54, color: widget.ink.withValues(alpha: 0.25)),
-        const SizedBox(width: 14),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              today.toUpperCase(),
-              style: TextStyle(
-                color: widget.ink,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.5,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              '${LauncherLogic.two(_now.day)} / ${LauncherLogic.two(_now.month)} / ${_now.year}',
-              style: TextStyle(color: widget.muted, fontSize: 11.5),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // 5. Cyber HUD Clock
-  Widget _buildCyberClock(LauncherStore store) {
-    final time = '${LauncherLogic.two(_now.hour)}:${LauncherLogic.two(_now.minute)}:${LauncherLogic.two(_now.second)}';
-    final secFrac = _now.second / 60.0;
-
-    return Container(
-      key: const ValueKey('clock_cyber'),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.28),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: widget.ink.withValues(alpha: 0.25)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'SYS//TIME ',
-                style: TextStyle(
-                  color: widget.muted,
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.4,
-                ),
-              ),
-              Text(
-                time,
-                style: TextStyle(
-                  color: widget.ink,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          SizedBox(
-            width: 190,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(2),
-              child: LinearProgressIndicator(
-                value: secFrac,
-                minHeight: 2.5,
-                backgroundColor: widget.ink.withValues(alpha: 0.12),
-                valueColor: AlwaysStoppedAnimation(widget.ink.withValues(alpha: 0.8)),
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'BAT ${store.batteryLevel}%${store.isCharging ? "⚡" : ""}  |  RAM ${store.ramPercent}%  |  ${LauncherLogic.two(_now.day)}.${LauncherLogic.two(_now.month)}',
-            style: TextStyle(
-              color: widget.muted,
-              fontSize: 9.5,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.8,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 6. Frosted Glass Pill Clock
-  Widget _buildGlassPillClock(LauncherStore store) {
-    final time = '${LauncherLogic.two(_now.hour)}:${LauncherLogic.two(_now.minute)}';
-    final today = LauncherLogic.weekdayFull[_now.weekday - 1];
-
-    return ClipRRect(
-      key: const ValueKey('clock_glass'),
-      borderRadius: BorderRadius.circular(28),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
-          decoration: BoxDecoration(
-            color: widget.ink.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: widget.ink.withValues(alpha: 0.18)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                time,
-                style: TextStyle(
-                  color: widget.ink,
-                  fontSize: 32,
-                  fontWeight: FontWeight.w600,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-              const SizedBox(width: 14),
-              Container(width: 1, height: 28, color: widget.ink.withValues(alpha: 0.22)),
-              const SizedBox(width: 14),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    today,
-                    style: TextStyle(
-                      color: widget.ink,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    '${LauncherLogic.two(_now.day)}-kun • ${store.batteryLevel}% 🔋',
-                    style: TextStyle(color: widget.muted, fontSize: 11),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSystemPulsePill(LauncherStore store) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: widget.ink.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            store.isCharging ? Icons.bolt_rounded : Icons.battery_std_rounded,
+            store.isCharging
+                ? Icons.bolt_rounded
+                : Icons.battery_std_rounded,
             size: 13,
-            color: widget.ink.withValues(alpha: 0.75),
+            color: const Color(0xFFABAFB5),
           ),
-          const SizedBox(width: 3),
+          const SizedBox(width: 4),
           Text(
             '${store.batteryLevel}%',
-            style: TextStyle(
-              color: widget.ink.withValues(alpha: 0.8),
+            style: const TextStyle(
+              color: Color(0xFFABAFB5),
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(width: 10),
-          Icon(Icons.memory_rounded, size: 13, color: widget.ink.withValues(alpha: 0.75)),
-          const SizedBox(width: 3),
+          const SizedBox(width: 8),
+          Container(
+            width: 3,
+            height: 3,
+            decoration: const BoxDecoration(
+              color: Color(0xFF677E8A),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
           Text(
-            'RAM ${store.ramPercent}%',
-            style: TextStyle(
-              color: widget.ink.withValues(alpha: 0.8),
+            '${store.deviceTempC.toStringAsFixed(0)}°C • RAM ${store.ramUsedPercent}%',
+            style: const TextStyle(
+              color: Color(0xFF677E8A),
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
           ),
-          if (store.incognitoMode) ...[
-            const SizedBox(width: 10),
-            Icon(Icons.visibility_off_rounded, size: 12, color: widget.ink.withValues(alpha: 0.85)),
-            const SizedBox(width: 3),
-            Text(
-              'Maxfiy',
-              style: TextStyle(
-                color: widget.ink.withValues(alpha: 0.85),
-                fontSize: 10.5,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
         ],
       ),
     );
   }
 
-  Widget _buildQuickNotePill(BuildContext context, LauncherStore store) {
-    return GestureDetector(
-      onTap: () => _editNoteDialog(context, store),
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 290),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+  Widget _buildDailyNotePill(LauncherStore store, Color fg, Color sub) {
+    if (_isEditingNote) {
+      return Container(
+        width: 210,
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: widget.ink.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: widget.ink.withValues(alpha: 0.12)),
+          color: const Color(0xFF0E1D21).withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: const Color(0xFFABAFB5).withValues(alpha: 0.4),
+          ),
+        ),
+        child: TextField(
+          controller: _noteController,
+          autofocus: true,
+          style: const TextStyle(color: Color(0xFFABAFB5), fontSize: 11.5),
+          decoration: const InputDecoration(
+            border: InputBorder.none,
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(vertical: 6),
+          ),
+          onSubmitted: (v) {
+            final clean = v.trim().isEmpty ? 'Kunlik maqsad' : v.trim();
+            store.updateSetting(() => store.dailyNote = clean);
+            setState(() => _isEditingNote = false);
+          },
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: () {
+        _noteController.text = store.dailyNote;
+        setState(() => _isEditingNote = true);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0E1D21).withValues(alpha: 0.65),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: const Color(0xFF677E8A).withValues(alpha: 0.25),
+            width: 0.8,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.edit_note_rounded, size: 14, color: widget.muted),
-            const SizedBox(width: 5),
-            Flexible(
-              child: Text(
-                store.quickNoteText,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: widget.ink.withValues(alpha: 0.82),
-                  fontSize: 11.5,
-                  fontStyle: FontStyle.italic,
-                ),
+            const Icon(
+              Icons.edit_note_rounded,
+              size: 13,
+              color: Color(0xFF677E8A),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              store.dailyNote,
+              style: const TextStyle(
+                color: Color(0xFFABAFB5),
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -624,152 +551,376 @@ class _ClockHeaderState extends State<ClockHeader> with TickerProviderStateMixin
     );
   }
 
-  void _editNoteDialog(BuildContext context, LauncherStore store) {
-    final ctrl = TextEditingController(text: store.quickNoteText);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF202429),
-        title: const Text('Eslatma vidjeti', style: TextStyle(color: Colors.white, fontSize: 16)),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: 'Eslatma yozing...',
-            hintStyle: TextStyle(color: Colors.white38),
+  /// Style 1: Exact Editorial Ribbon from the user's screenshot (20:43 + wed thu fri Saturday sun mon tue + 09 badge)
+  Widget _buildEditorialRibbon(Color fg, Color sub, double scale) {
+    final currentIdx = _now.weekday - 1;
+    final dayNumber = _now.day.toString().padLeft(2, '0');
+
+    final List<Widget> dayItems = [];
+    for (int offset = -3; offset <= 3; offset++) {
+      final idx = (currentIdx + offset + 7) % 7;
+      if (offset == 0) {
+        dayItems.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              _fullDays[idx],
+              style: TextStyle(
+                fontSize: 15 * scale,
+                fontWeight: FontWeight.w500,
+                color: fg.withValues(alpha: 0.88),
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+        );
+      } else {
+        dayItems.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Text(
+              _shortDays[idx],
+              style: TextStyle(
+                fontSize: 11.5 * scale,
+                fontWeight: FontWeight.w500,
+                color: sub,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '${_formatHour()}:${_formatMinute()}',
+          style: TextStyle(
+            fontSize: 48 * scale,
+            fontWeight: FontWeight.w400,
+            color: fg,
+            letterSpacing: -0.5,
+            height: 1.05,
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Bekor qilish'),
+        const SizedBox(height: 6),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const NeverScrollableScrollPhysics(),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: dayItems,
           ),
-          ElevatedButton(
-            onPressed: () {
-              store.setQuickNoteText(ctrl.text);
-              Navigator.pop(ctx);
-            },
-            child: const Text('Saqlash'),
+        ),
+        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 42),
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 0.9,
+                  color: fg.withValues(alpha: 0.28),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Container(
+                  width: 25 * scale,
+                  height: 25 * scale,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0E1D21),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: fg.withValues(alpha: 0.35),
+                      width: 1,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    dayNumber,
+                    style: TextStyle(
+                      fontSize: 10.5 * scale,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFFABAFB5),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  height: 0.9,
+                  color: fg.withValues(alpha: 0.28),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Style 2: Bauhaus Split Typography
+  Widget _buildBauhausSplit(Color fg, Color sub, double scale) {
+    final dayName = _fullDays[_now.weekday - 1].toUpperCase();
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            _formatHour(),
+            style: TextStyle(
+              fontSize: 56 * scale,
+              fontWeight: FontWeight.w800,
+              color: fg,
+              height: 0.95,
+              letterSpacing: -2,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Container(
+              width: 3,
+              height: 44 * scale,
+              decoration: BoxDecoration(
+                color: const Color(0xFF677E8A),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _formatMinute(),
+                style: TextStyle(
+                  fontSize: 28 * scale,
+                  fontWeight: FontWeight.w300,
+                  color: fg.withValues(alpha: 0.9),
+                  height: 1.0,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                '$dayName • ${_now.day}',
+                style: TextStyle(
+                  fontSize: 10.5 * scale,
+                  fontWeight: FontWeight.w700,
+                  color: sub,
+                  letterSpacing: 1.8,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _day(String d) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Text(d, style: TextStyle(color: widget.ink.withValues(alpha: 0.75), fontSize: 11)),
-      );
+  /// Style 3: Nordic Slate Matrix Card (#0E1D21 & #122E34 & #677E8A)
+  Widget _buildNordicSlateMatrix(Color fg, Color sub, double scale) {
+    final dayName = _fullDays[_now.weekday - 1].toUpperCase();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0E1D21).withValues(alpha: 0.78),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: const Color(0xFF677E8A).withValues(alpha: 0.35),
+          width: 1.1,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '${_formatHour()} : ${_formatMinute()}',
+            style: TextStyle(
+              fontSize: 38 * scale,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFFABAFB5),
+              letterSpacing: 3,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '$dayName  //  ${_now.day}.${_now.month.toString().padLeft(2, '0')}.${_now.year}',
+            style: TextStyle(
+              fontSize: 10 * scale,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF677E8A),
+              letterSpacing: 2.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Style 4: Minimal Zen
+  Widget _buildMinimalZen(Color fg, Color sub, double scale) {
+    final dayName = _fullDays[_now.weekday - 1];
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '${_formatHour()}:${_formatMinute()}',
+          style: TextStyle(
+            fontSize: 52 * scale,
+            fontWeight: FontWeight.w200,
+            color: fg,
+            letterSpacing: 2,
+            height: 1.0,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '$dayName, ${_now.day}',
+          style: TextStyle(
+            fontSize: 13 * scale,
+            fontWeight: FontWeight.w400,
+            color: sub,
+            letterSpacing: 1.2,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Style 5: Analog Chrono Dial
+  Widget _buildAnalogChrono(Color fg, Color sub, double scale) {
+    final size = 96.0 * scale;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: size,
+          height: size,
+          child: CustomPaint(
+            painter: _AnalogClockPainter(now: _now, color: fg, subtle: sub),
+          ),
+        ),
+        const SizedBox(width: 18),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${_formatHour()}:${_formatMinute()}',
+              style: TextStyle(
+                fontSize: 32 * scale,
+                fontWeight: FontWeight.w600,
+                color: fg,
+              ),
+            ),
+            Text(
+              '${_fullDays[_now.weekday - 1]} • ${_now.day}',
+              style: TextStyle(
+                fontSize: 12 * scale,
+                color: sub,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 }
 
-class _BauhausAnalogPainter extends CustomPainter {
+class _AnalogClockPainter extends CustomPainter {
   final DateTime now;
-  final Color ink;
-  final Color muted;
+  final Color color;
+  final Color subtle;
 
-  _BauhausAnalogPainter({required this.now, required this.ink, required this.muted});
+  _AnalogClockPainter({
+    required this.now,
+    required this.color,
+    required this.subtle,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height / 2);
-    final r = size.width / 2 - 2;
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
 
-    // Dial ring
-    canvas.drawCircle(
-      c,
-      r,
-      Paint()
-        ..color = ink.withValues(alpha: 0.25)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4,
-    );
+    final ringPaint = Paint()
+      ..color = subtle.withValues(alpha: 0.45)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6;
+    canvas.drawCircle(center, radius - 2, ringPaint);
 
-    // 12 hour markers
-    for (var i = 0; i < 12; i++) {
-      final a = i * pi / 6;
-      final inner = i % 3 == 0 ? r - 7 : r - 4;
+    for (int i = 0; i < 12; i++) {
+      final angle = (i * 30) * math.pi / 180;
+      final outer = Offset(
+        center.dx + (radius - 5) * math.cos(angle),
+        center.dy + (radius - 5) * math.sin(angle),
+      );
+      final inner = Offset(
+        center.dx + (radius - (i % 3 == 0 ? 11 : 8)) * math.cos(angle),
+        center.dy + (radius - (i % 3 == 0 ? 11 : 8)) * math.sin(angle),
+      );
       canvas.drawLine(
-        c + Offset(cos(a) * inner, sin(a) * inner),
-        c + Offset(cos(a) * (r - 1.5), sin(a) * (r - 1.5)),
+        inner,
+        outer,
         Paint()
-          ..color = ink.withValues(alpha: i % 3 == 0 ? 0.85 : 0.38)
-          ..strokeWidth = i % 3 == 0 ? 1.8 : 1.0,
+          ..color = i % 3 == 0 ? color : subtle
+          ..strokeWidth = i % 3 == 0 ? 2.0 : 1.0,
       );
     }
 
-    final hourAngle = ((now.hour % 12) + now.minute / 60.0) * pi / 6 - pi / 2;
-    final minAngle = (now.minute + now.second / 60.0) * pi / 30 - pi / 2;
-    final secAngle = now.second * pi / 30 - pi / 2;
+    final hourAngle =
+        ((now.hour % 12 + now.minute / 60.0) * 30 - 90) * math.pi / 180;
+    final minAngle = ((now.minute + now.second / 60.0) * 6 - 90) * math.pi / 180;
+    final secAngle = (now.second * 6 - 90) * math.pi / 180;
 
-    // Hour hand
     canvas.drawLine(
-      c,
-      c + Offset(cos(hourAngle) * r * 0.50, sin(hourAngle) * r * 0.50),
+      center,
+      Offset(
+        center.dx + radius * 0.46 * math.cos(hourAngle),
+        center.dy + radius * 0.46 * math.sin(hourAngle),
+      ),
       Paint()
-        ..color = ink
-        ..strokeWidth = 2.6
+        ..color = color
+        ..strokeWidth = 2.8
         ..strokeCap = StrokeCap.round,
     );
 
-    // Minute hand
     canvas.drawLine(
-      c,
-      c + Offset(cos(minAngle) * r * 0.74, sin(minAngle) * r * 0.74),
+      center,
+      Offset(
+        center.dx + radius * 0.68 * math.cos(minAngle),
+        center.dy + radius * 0.68 * math.sin(minAngle),
+      ),
       Paint()
-        ..color = ink
-        ..strokeWidth = 1.8
+        ..color = color.withValues(alpha: 0.85)
+        ..strokeWidth = 2.0
         ..strokeCap = StrokeCap.round,
     );
 
-    // Bauhaus orange-red second hand
     canvas.drawLine(
-      c - Offset(cos(secAngle) * 5, sin(secAngle) * 5),
-      c + Offset(cos(secAngle) * r * 0.82, sin(secAngle) * r * 0.82),
+      center,
+      Offset(
+        center.dx + radius * 0.74 * math.cos(secAngle),
+        center.dy + radius * 0.74 * math.sin(secAngle),
+      ),
       Paint()
-        ..color = const Color(0xFFE0533C)
+        ..color = const Color(0xFFE0B4B2)
         ..strokeWidth = 1.2
         ..strokeCap = StrokeCap.round,
     );
 
-    canvas.drawCircle(c, 2.5, Paint()..color = const Color(0xFFE0533C));
+    canvas.drawCircle(center, 3.2, Paint()..color = color);
   }
 
   @override
-  bool shouldRepaint(covariant _BauhausAnalogPainter old) =>
-      old.now.second != now.second || old.ink != ink;
-}
-
-class _RollingChar extends StatelessWidget {
-  final String char;
-  final Color color;
-  const _RollingChar({super.key, required this.char, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    final style = TextStyle(
-      color: color,
-      fontSize: 44,
-      fontWeight: FontWeight.w400,
-      height: 1.08,
-      letterSpacing: -0.5,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
-    return ClipRect(
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 520),
-        switchInCurve: Curves.easeOutBack,
-        switchOutCurve: Curves.easeIn,
-        transitionBuilder: (child, anim) {
-          final incoming = child.key == ValueKey(char);
-          final offset = Tween<Offset>(
-            begin: incoming ? const Offset(0, 1) : const Offset(0, -1),
-            end: Offset.zero,
-          ).animate(anim);
-          return SlideTransition(position: offset, child: FadeTransition(opacity: anim, child: child));
-        },
-        child: Text(char, key: ValueKey(char), style: style),
-      ),
-    );
-  }
+  bool shouldRepaint(covariant _AnalogClockPainter oldDelegate) =>
+      oldDelegate.now.second != now.second || oldDelegate.color != color;
 }

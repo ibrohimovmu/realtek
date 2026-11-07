@@ -1,13 +1,53 @@
 import 'dart:math';
 import 'dart:typed_data';
+import 'package:flutter/material.dart';
+
+/// Official Nordic Slate & Deep Petrol Architectural Palette
+/// from the user's reference image:
+/// #0E1D21, #122E34, #622347 / #283E47, #677E8A, #ABAFB5, #E0B4B2
+class NordicPalette {
+  static const int obsidianTealHex = 0xFF0E1D21;
+  static const int abyssalTealHex = 0xFF122E34;
+  static const int deepPetrolHex = 0xFF283E47;
+  static const int mutedPlumHex = 0xFF622347;
+  static const int steelSlateHex = 0xFF677E8A;
+  static const int silverMistHex = 0xFFABAFB5;
+  static const int warmSlateHex = 0xFF62686D;
+  static const int roseSilverHex = 0xFFE0B4B2;
+
+  static const List<int> allSwatches = [
+    obsidianTealHex, // #0E1D21
+    abyssalTealHex,  // #122E34
+    deepPetrolHex,   // Deep Petrol Slate
+    steelSlateHex,   // #677E8A
+    warmSlateHex,    // Warm Architectural Slate
+    silverMistHex,   // #ABAFB5
+    mutedPlumHex,    // #622347
+    roseSilverHex,   // #E0B4B2
+  ];
+}
 
 /// An installed, launchable application.
 class AppInfo {
   final String label;
   final String package;
   final Uint8List icon;
+  final bool isGame;
+  final IconData fallbackIcon;
 
-  const AppInfo({required this.label, required this.package, required this.icon});
+  const AppInfo({
+    required this.label,
+    required this.package,
+    required this.icon,
+    this.isGame = false,
+    this.fallbackIcon = Icons.apps_rounded,
+  });
+
+  String get name => label;
+  String get packageName => package;
+  Uint8List? get iconBytes => icon.isNotEmpty ? icon : null;
+  String get initial =>
+      label.trim().isNotEmpty ? label.trim()[0].toUpperCase() : '#';
 
   factory AppInfo.fromMap(Map<dynamic, dynamic> map) {
     final raw = map['icon'];
@@ -15,6 +55,7 @@ class AppInfo {
       label: (map['label'] ?? '').toString(),
       package: (map['package'] ?? '').toString(),
       icon: raw is Uint8List ? raw : Uint8List(0),
+      isGame: map['isGame'] == true,
     );
   }
 }
@@ -39,21 +80,31 @@ class LaunchRecord {
 }
 
 enum ClockStyle {
-  reference('Minimal Klassik'),
-  flip('3D Flip Soat'),
-  analog('Bauhaus Analog'),
-  editorial('Katta Vertikal'),
-  cyber('Kiber HUD'),
-  glassPill('Shaffof Kapsula');
+  editorialRibbon('Editorial Ribbon'),
+  bauhausSplit('Bauhaus Split'),
+  neonMatrix('Nordic Slate Matrix'),
+  minimalZen('Minimal Zen'),
+  analogChrono('Analog Xronograf');
 
+  static const ClockStyle reference = ClockStyle.editorialRibbon;
   final String title;
   const ClockStyle(this.title);
+}
+
+enum IconPackStyle {
+  monochromeDisc('Qora Doira (Asl)'),
+  frostedGlass('Muzlatilgan Oyna'),
+  outlineMinimal('Minimal Chiziqli'),
+  cyberHex('Geometrik Kvadrat');
+
+  final String title;
+  const IconPackStyle(this.title);
 }
 
 enum IconStyle {
   darkDisc('Qora Doira (Asl)'),
   glass('Muzlatilgan Oyna'),
-  neonRing('Neon Halqa'),
+  neonRing('Kumush Halqa'),
   original('Tabiiy Rangli'),
   monochrome('Oq-Qora'),
   minimalText('Faqat Yozuv');
@@ -62,13 +113,29 @@ enum IconStyle {
   const IconStyle(this.title);
 }
 
+enum WallpaperPreset {
+  sageZen,
+  noirCatMoon,
+  duneEclipse,
+  cyberRain,
+  nordicAurora,
+  bauhausArch,
+  customPhoto,
+}
+
+enum AnimationPreset {
+  calmZen,
+  liquidSpring,
+  kineticHyper,
+}
+
 enum ParticleType {
-  dust('Chang Zarrachalari'),
-  fireflies('Tungi Qo\'ng\'izlar'),
-  sakura('Sakura Yaprog\'i'),
-  cosmos('Yulduzli Kosmos'),
+  dust('Kumush Zarrachalar'),
+  fireflies('Tungi Yog\'du'),
+  sakura('Barglar'),
+  cosmos('Sokin Yulduzlar'),
   snow('Mayin Qor'),
-  matrix('Raqamli Yomg\'ir'),
+  matrix('Minimal Chiziqlar'),
   none('O\'chirilgan');
 
   final String title;
@@ -76,10 +143,10 @@ enum ParticleType {
 }
 
 enum WallpaperType {
-  solid('Minimal Ranglar'),
-  bundledArt('Kreativ Rasmlar'),
-  liveScene('Jonli San\'at'),
-  customFile('AI / Galereya');
+  solid('Arxitektura Palitrasi'),
+  bundledArt('Real Fotografiya'),
+  liveScene('Jonli Sahna'),
+  customFile('Unsplash / Galereya');
 
   final String title;
   const WallpaperType(this.title);
@@ -95,6 +162,18 @@ enum CrescentFilter {
   const CrescentFilter(this.title);
 }
 
+enum LaunchAnimStyle {
+  portalIris('Portal Halqa'),
+  kineticSlide('Kinetik Silliq'),
+  liquidMorph('Suyuq To\'lqin'),
+  shutterSplit('Parda Effekt');
+
+  static const LaunchAnimStyle liquidWave = LaunchAnimStyle.liquidMorph;
+  static const LaunchAnimStyle minimalShutter = LaunchAnimStyle.shutterSplit;
+  final String title;
+  const LaunchAnimStyle(this.title);
+}
+
 /// Pure helpers kept free of Flutter so they can be unit tested.
 class LauncherLogic {
   static const weekdayShort = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -108,7 +187,6 @@ class LauncherLogic {
     'Sunday',
   ];
 
-  /// Returns the short names of the three days before and after [day].
   static ({List<String> before, List<String> after}) weekStrip(DateTime day) {
     final idx = day.weekday - 1;
     final before = <String>[];
@@ -124,14 +202,10 @@ class LauncherLogic {
 
   static String two(int v) => v.toString().padLeft(2, '0');
 
-  /// Computes the 2D position, scale, and opacity of an item on the half-moon
-  /// crescent wheel given its signed normalized offset [normOffset] in [-1.0, 1.0]
-  /// from the focal center of the wheel.
-  /// - At `normOffset == 0.0`, the item is at the furthest apex of the crescent,
-  ///   with maximum scale (`1.08`) and opacity (`1.0`).
-  /// - Towards `-1.0` (top) and `+1.0` (bottom), the item curves back along a
-  ///   half-moon arc (`cos(theta)`), scales down, and fades smoothly.
-  static ({double dx, double dy, double scale, double opacity, double angleRad}) crescentPoint({
+  /// Kept for backward-compatible geometry tests; when curvature == 0,
+  /// items align in a pure vertical architectural stack.
+  static ({double dx, double dy, double scale, double opacity, double angleRad})
+      crescentPoint({
     required double normOffset,
     required double height,
     required double maxArchDepth,
@@ -139,23 +213,24 @@ class LauncherLogic {
     required bool leftSide,
   }) {
     final clamped = normOffset.clamp(-1.35, 1.35);
-    // Angle along the half-moon: -pi/2.2 .. +pi/2.2
     final theta = clamped * (pi * 0.44);
     final curveFactor = curvature.clamp(0.0, 1.0);
 
-    // Horizontal protrusion along the crescent curve
     final arch = cos(theta);
     final indent = (1.0 - arch) * maxArchDepth * curveFactor;
-    final apexPush = sin((1.0 - clamped.abs().clamp(0.0, 1.0)) * pi * 0.5) * 18.0 * curveFactor;
+    final apexPush =
+        sin((1.0 - clamped.abs().clamp(0.0, 1.0)) * pi * 0.5) *
+            18.0 *
+            curveFactor;
 
     final dx = leftSide
         ? (maxArchDepth * curveFactor - indent + apexPush)
         : (indent - apexPush);
 
-    // Vertical position along the arc
     final linearY = (height * 0.5) + clamped * (height * 0.44);
     final arcY = (height * 0.5) + sin(theta) * (height * 0.45);
-    final dy = linearY * (1.0 - curveFactor * 0.55) + arcY * (curveFactor * 0.55);
+    final dy =
+        linearY * (1.0 - curveFactor * 0.55) + arcY * (curveFactor * 0.55);
 
     final dist = clamped.abs();
     final scale = (1.08 - dist * 0.34).clamp(0.62, 1.08);
@@ -171,7 +246,6 @@ class LauncherLogic {
     );
   }
 
-  /// Formats a duration in milliseconds into a human-readable Uzbek string.
   static String formatDurationUz(int ms) {
     if (ms <= 0) return '0 daq';
     final totalMin = (ms / 60000).ceil();
@@ -181,7 +255,6 @@ class LauncherLogic {
     return m == 0 ? '$h soat' : '$h soat $m daq';
   }
 
-  /// Formats a timestamp into a relative Uzbek time string ("Hozirgina", "12 daq oldin", etc.).
   static String formatTimeAgoUz(int timestampMs, {DateTime? nowOverride}) {
     final now = nowOverride ?? DateTime.now();
     final dt = DateTime.fromMillisecondsSinceEpoch(timestampMs);
@@ -192,9 +265,6 @@ class LauncherLogic {
     return '${two(dt.day)}.${two(dt.month)} ${two(dt.hour)}:${two(dt.minute)}';
   }
 
-  /// Filters apps by a free-text query. Matches on substrings of the label,
-  /// the package name and word initials ("wa" -> "WhatsApp" is a substring,
-  /// "gm" -> "Google Maps" by initials). Prefix matches are ranked first.
   static List<AppInfo> search(List<AppInfo> apps, String query) {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) return List.of(apps);
@@ -222,7 +292,9 @@ class LauncherLogic {
     }
     scored.sort((a, b) {
       final c = a.$1.compareTo(b.$1);
-      return c != 0 ? c : a.$2.label.toLowerCase().compareTo(b.$2.label.toLowerCase());
+      return c != 0
+          ? c
+          : a.$2.label.toLowerCase().compareTo(b.$2.label.toLowerCase());
     });
     return scored.map((e) => e.$2).toList();
   }

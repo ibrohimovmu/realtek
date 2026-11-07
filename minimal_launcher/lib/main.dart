@@ -7,72 +7,46 @@ import 'services/launcher_store.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Edge to edge transparent system bars
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
       systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarIconBrightness: Brightness.dark,
-      systemNavigationBarDividerColor: Colors.transparent,
     ),
   );
 
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  final store = LauncherStore();
+  final ai = AiAssistantService();
+  await store.init();
 
-  // Load favorites, background, settings, installed applications, and Nova AI Assistant
-  await LauncherStore.i.init();
-  await AiAssistantService.i.init();
-
-  runApp(const MinimalLauncherApp());
+  runApp(MinimalLauncherApp(store: store, ai: ai));
 }
 
 class MinimalLauncherApp extends StatelessWidget {
-  const MinimalLauncherApp({super.key});
+  final LauncherStore store;
+  final AiAssistantService ai;
+
+  const MinimalLauncherApp({
+    super.key,
+    required this.store,
+    required this.ai,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: LauncherStore.i,
-      builder: (context, _) {
-        final store = LauncherStore.i;
-        final isDark = store.isDark;
-
-        final systemUiOverlay = SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-          systemNavigationBarColor: Colors.transparent,
-          systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-          systemNavigationBarDividerColor: Colors.transparent,
-        );
-
-        return AnnotatedRegion<SystemUiOverlayStyle>(
-          value: systemUiOverlay,
-          child: MaterialApp(
-            title: 'Minimal Launcher',
-            debugShowCheckedModeBanner: false,
-            themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
-            theme: ThemeData(
-              useMaterial3: true,
-              brightness: Brightness.light,
-              scaffoldBackgroundColor: Color(store.background),
-              fontFamily: 'Roboto',
-              splashFactory: InkSparkle.splashFactory,
-            ),
-            darkTheme: ThemeData(
-              useMaterial3: true,
-              brightness: Brightness.dark,
-              scaffoldBackgroundColor: Color(store.background),
-              fontFamily: 'Roboto',
-              splashFactory: InkSparkle.splashFactory,
-            ),
-            home: const HomeScreen(),
-          ),
-        );
-      },
+    return MaterialApp(
+      title: 'Minimal Launcher',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFF0E1D21),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF677E8A),
+          brightness: Brightness.dark,
+          surface: const Color(0xFF0E1D21),
+        ),
+      ),
+      home: HomeScreen(store: store, ai: ai),
     );
   }
 }

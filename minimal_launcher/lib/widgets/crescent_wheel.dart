@@ -1,538 +1,895 @@
-import 'dart:math';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import '../models/app_info.dart';
 import '../services/launcher_store.dart';
-import 'app_tile.dart';
 
-/// Interactive Half-Moon Crescent Rotary Wheel (`Yarim Oy Aylanma Menyu`).
-/// Replaces traditional swipe-up drawers by letting all apps rotate smoothly
-/// along a curved orbital arc directly on the home screen.
+enum WheelCategory { all, favorites, recent }
+
 class CrescentWheel extends StatefulWidget {
-  final Color ink;
-  final Color muted;
-  final VoidCallback onOpenActivityLog;
+  final LauncherStore store;
   final VoidCallback onOpenCustomize;
+  final VoidCallback onOpenActivity;
+  final VoidCallback onOpenGameHub;
 
   const CrescentWheel({
     super.key,
-    required this.ink,
-    required this.muted,
-    required this.onOpenActivityLog,
+    required this.store,
     required this.onOpenCustomize,
+    required this.onOpenActivity,
+    required this.onOpenGameHub,
   });
 
   @override
   State<CrescentWheel> createState() => _CrescentWheelState();
 }
 
-class _CrescentWheelState extends State<CrescentWheel> with SingleTickerProviderStateMixin {
-  late final AnimationController _coastController;
-  final TextEditingController _searchCtrl = TextEditingController();
+class _CrescentWheelState extends State<CrescentWheel>
+    with SingleTickerProviderStateMixin {
+  final ScrollController _scrollController = ScrollController();
+  double _scrollOffset = 0.0;
+  int _lastHapticIdx = -1;
+  bool _isSearching = false;
+  WheelCategory _category = WheelCategory.all;
+  final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
-
-  double _scrollIndex = 0.0;
-  int _lastTickIndex = 0;
-  bool _searching = false;
-  String _query = '';
-
-  static const double _itemStepPx = 56.0;
-  static const int _halfVisible = 3; // 7 items visible along the crescent (-3..+3)
+  late final AnimationController _entranceCtrl;
 
   @override
   void initState() {
     super.initState();
-    _coastController = AnimationController.unbounded(vsync: this)
-      ..addListener(() {
-        setState(() {
-          _scrollIndex = _coastController.value;
-          _checkHapticTick();
-        });
-      });
-    _searchCtrl.addListener(() {
-      if (_searchCtrl.text != _query) {
-        setState(() {
-          _query = _searchCtrl.text;
-          _scrollIndex = 0.0;
-        });
-      }
+    _entranceCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 780),
+    )..forward();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (!mounted) return;
+    setState(() {
+      _scrollOffset = _scrollController.offset;
     });
-  }
 
-  @override
-  void dispose() {
-    _coastController.dispose();
-    _searchCtrl.dispose();
-    _searchFocus.dispose();
-    super.dispose();
-  }
-
-  void _checkHapticTick() {
-    final rounded = _scrollIndex.round();
-    if (rounded != _lastTickIndex) {
-      _lastTickIndex = rounded;
+    final spacing = widget.store.itemSpacing;
+    final currentCenterIdx = (_scrollOffset / spacing).round();
+    if (currentCenterIdx != _lastHapticIdx) {
+      _lastHapticIdx = currentCenterIdx;
       HapticFeedback.selectionClick();
     }
   }
 
-  void _onVerticalDragStart(DragStartDetails details) {
-    _coastController.stop();
+  @override
+  void dispose() {
+    _entranceCtrl.dispose();
+    _scrollController.dispose();
+    _searchController.dispose();
+    _searchFocus.dispose();
+    super.dispose();
   }
 
-  void _onVerticalDragUpdate(DragUpdateDetails details, int count) {
-    if (count <= 0) return;
-    final deltaItems = -details.delta.dy / _itemStepPx;
-    setState(() {
-      _scrollIndex += deltaItems;
-      if (count <= 7) {
-        _scrollIndex = _scrollIndex.clamp(0.0, max(0.0, (count - 1).toDouble()));
-      }
-      _checkHapticTick();
-    });
-  }
-
-  void _onVerticalDragEnd(DragEndDetails details, int count) {
-    if (count <= 0) return;
-    final velocityItemsPerSec = -details.velocity.pixelsPerSecond.dy / _itemStepPx;
-    if (velocityItemsPerSec.abs() > 0.8) {
-      final friction = FrictionSimulation(0.18, _scrollIndex, velocityItemsPerSec);
-      final targetSnap = friction.finalX.roundToDouble();
-      final double clampedTarget = count <= 7
-          ? targetSnap.clamp(0.0, max(0.0, (count - 1).toDouble())).toDouble()
-          : targetSnap;
-      final spring = SpringSimulation(
-        const SpringDescription(mass: 1.0, stiffness: 150.0, damping: 21.0),
-        _scrollIndex,
-        clampedTarget,
-        velocityItemsPerSec * 0.45,
-      );
-      _coastController.animateWith(spring);
-    } else {
-      final double target = count <= 7
-          ? _scrollIndex.roundToDouble().clamp(0.0, max(0.0, (count - 1).toDouble())).toDouble()
-          : _scrollIndex.roundToDouble();
-      _coastController.animateTo(
-        target,
-        duration: const Duration(milliseconds: 240),
-        curve: Curves.easeOutCubic,
-      );
+  List<AppInfo> _resolveApps() {
+    final store = widget.store;
+    if (_isSearching && store.searchQuery.trim().isNotEmpty) {
+      return store.visibleApps;
     }
+    return switch (_category) {
+      WheelCategory.all => store.visibleApps,
+      WheelCategory.favorites => store.favoriteApps,
+      WheelCategory.recent => store.recentApps,
+    };
   }
 
-  void _jumpToLetter(String letter, List<AppInfo> list) {
-    final idx = list.indexWhere((a) => a.label.toUpperCase().startsWith(letter));
-    if (idx >= 0) {
+  void _scrollToLetter(String letter, List<AppInfo> apps) {
+    final idx = apps.indexWhere((a) => a.initial == letter);
+    if (idx >= 0 && _scrollController.hasClients) {
       HapticFeedback.lightImpact();
-      _coastController.animateTo(
-        idx.toDouble(),
-        duration: const Duration(milliseconds: 360),
+      final target = (idx * widget.store.itemSpacing).clamp(
+        0.0,
+        _scrollController.position.maxScrollExtent,
+      );
+      _scrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 280),
         curve: Curves.easeOutCubic,
       );
     }
+  }
+
+  void _toggleSearch(LauncherStore store) {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _isSearching = !_isSearching;
+      if (!_isSearching) {
+        _searchController.clear();
+        store.setSearchQuery('');
+        _searchFocus.unfocus();
+      } else {
+        Future.delayed(const Duration(milliseconds: 120), () {
+          if (mounted) _searchFocus.requestFocus();
+        });
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final store = LauncherStore.i;
-    final baseList = store.visibleApps;
-    final apps = _query.isEmpty ? baseList : LauncherLogic.search(baseList, _query);
-    final count = apps.length;
-    final leftSide = store.wheelLeftSide;
+    final store = widget.store;
+    final apps = _resolveApps();
+    final itemExtent = store.itemSpacing;
+    final fg = store.foregroundColor;
+
+    final letters = apps.map((a) => a.initial).toSet().toList()..sort();
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 1. Top Control Strip: Filter pills + Inline Search + Activity History button
-        _buildFilterAndSearchBar(store),
-
-        // 2. Main Crescent Half-Moon Wheel Area
-        Expanded(
-          child: count == 0
-              ? _buildEmptyState()
-              : LayoutBuilder(
-                  builder: (context, constraints) {
-                    final h = constraints.maxHeight;
-                    final w = constraints.maxWidth;
-                    final maxArchDepth = min(w * 0.24, 92.0);
-                    final loopMode = count > 7;
-
-                    return GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onVerticalDragStart: _onVerticalDragStart,
-                      onVerticalDragUpdate: (d) => _onVerticalDragUpdate(d, count),
-                      onVerticalDragEnd: (d) => _onVerticalDragEnd(d, count),
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          // Crescent Orbit Track & Tick Marks
-                          Positioned.fill(
-                            child: IgnorePointer(
-                              child: CustomPaint(
-                                painter: _CrescentOrbitPainter(
-                                  ink: widget.ink,
-                                  curvature: store.wheelCurvature,
-                                  leftSide: leftSide,
-                                  scrollPhase: _scrollIndex,
-                                  maxArchDepth: maxArchDepth,
+        // Top Filter & Morphing Search Strip
+        Padding(
+          padding: const EdgeInsets.fromLTRB(26, 0, 20, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: [
+                    // Morphing Search Trigger Pill
+                    GestureDetector(
+                      onTap: () => _toggleSearch(store),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOutBack,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: _isSearching ? 12 : 9,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _isSearching
+                              ? const Color(0xFF677E8A)
+                              : const Color(0xFF0E1D21).withValues(alpha: 0.72),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: const Color(0xFFABAFB5)
+                                .withValues(alpha: 0.24),
+                            width: 0.9,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _isSearching
+                                  ? Icons.close_rounded
+                                  : Icons.search_rounded,
+                              size: 15,
+                              color: _isSearching
+                                  ? const Color(0xFF0E1D21)
+                                  : const Color(0xFFABAFB5),
+                            ),
+                            if (_isSearching) ...[
+                              const SizedBox(width: 5),
+                              const Text(
+                                'Yopish',
+                                style: TextStyle(
+                                  color: Color(0xFF0E1D21),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            ),
-                          ),
-
-                          // Apps positioned along the Half-Moon Crescent
-                          ..._buildWheelItems(
-                            apps: apps,
-                            height: h,
-                            width: w,
-                            maxArchDepth: maxArchDepth,
-                            curvature: store.wheelCurvature,
-                            leftSide: leftSide,
-                            loopMode: loopMode,
-                            store: store,
-                          ),
-
-                          // Quick-jump alphabet scrubber along the outer edge when in All mode
-                          if (count > 10 && !_searching)
-                            Positioned(
-                              top: h * 0.08,
-                              bottom: h * 0.08,
-                              left: leftSide ? 2 : null,
-                              right: leftSide ? null : 2,
-                              child: _buildMiniLetterRail(apps),
-                            ),
-                        ],
+                            ],
+                          ],
+                        ),
                       ),
-                    );
-                  },
+                    ),
+                    const SizedBox(width: 6),
+                    _buildCategoryChip(
+                      label: 'Hammasi',
+                      selected: _category == WheelCategory.all,
+                      fg: fg,
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() => _category = WheelCategory.all);
+                      },
+                    ),
+                    const SizedBox(width: 6),
+                    _buildCategoryChip(
+                      label: 'Asosiy ★',
+                      selected: _category == WheelCategory.favorites,
+                      fg: fg,
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() => _category = WheelCategory.favorites);
+                      },
+                    ),
+                    const SizedBox(width: 6),
+                    _buildCategoryChip(
+                      label: 'Oxirgi 🕒',
+                      selected: _category == WheelCategory.recent,
+                      fg: fg,
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() => _category = WheelCategory.recent);
+                      },
+                    ),
+                    const SizedBox(width: 6),
+                    _buildActionChip(
+                      icon: Icons.sports_esports_rounded,
+                      label: 'Game Hub',
+                      onTap: widget.onOpenGameHub,
+                    ),
+                    const SizedBox(width: 6),
+                    _buildActionChip(
+                      icon: Icons.insights_rounded,
+                      label: 'Faollik',
+                      onTap: widget.onOpenActivity,
+                    ),
+                    const SizedBox(width: 6),
+                    _buildActionChip(
+                      icon: Icons.tune_rounded,
+                      label: 'Sozlash',
+                      onTap: widget.onOpenCustomize,
+                    ),
+                  ],
                 ),
+              ),
+
+              // Smooth Elastic Expanding Search Bar
+              AnimatedSize(
+                duration: const Duration(milliseconds: 340),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: _isSearching
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 10, right: 6),
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0.92, end: 1.0),
+                          duration: const Duration(milliseconds: 320),
+                          curve: Curves.easeOutBack,
+                          builder: (context, scale, child) => Transform.scale(
+                            scale: scale,
+                            alignment: Alignment.centerLeft,
+                            child: child,
+                          ),
+                          child: Container(
+                            height: 42,
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0E1D21)
+                                  .withValues(alpha: 0.88),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: const Color(0xFF677E8A)
+                                    .withValues(alpha: 0.45),
+                                width: 1.1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.25),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.search_rounded,
+                                  size: 17,
+                                  color: Color(0xFF677E8A),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _searchController,
+                                    focusNode: _searchFocus,
+                                    style: const TextStyle(
+                                      color: Color(0xFFABAFB5),
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    decoration: const InputDecoration(
+                                      hintText:
+                                          'Ilovani qidiring va Enter bosing...',
+                                      hintStyle: TextStyle(
+                                        color: Color(0xFF677E8A),
+                                        fontSize: 13,
+                                      ),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                    ),
+                                    onChanged: store.setSearchQuery,
+                                    onSubmitted: (_) {
+                                      final matches = _resolveApps();
+                                      if (matches.isNotEmpty) {
+                                        _launchWithVaultCheck(
+                                          context,
+                                          store,
+                                          matches.first,
+                                        );
+                                      }
+                                    },
+                                  ),
+                                ),
+                                if (_searchController.text.isNotEmpty)
+                                  GestureDetector(
+                                    onTap: () {
+                                      _searchController.clear();
+                                      store.setSearchQuery('');
+                                    },
+                                    child: const Icon(
+                                      Icons.clear_rounded,
+                                      size: 16,
+                                      color: Color(0xFF677E8A),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
+        ),
+
+        // Main Vertical Architectural App Stack
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final viewportHeight = constraints.maxHeight;
+              final centerY = viewportHeight * 0.44;
+
+              if (apps.isEmpty) {
+                return Center(
+                  child: Text(
+                    'Ilova topilmadi',
+                    style: TextStyle(
+                      color: fg.withValues(alpha: 0.6),
+                      fontSize: 14,
+                    ),
+                  ),
+                );
+              }
+
+              return Stack(
+                children: [
+                  ListView.builder(
+                    controller: _scrollController,
+                    physics: const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
+                    ),
+                    padding: EdgeInsets.only(
+                      top: math.max(14.0, viewportHeight * 0.05),
+                      bottom: math.max(84.0, viewportHeight * 0.25),
+                    ),
+                    itemExtent: itemExtent,
+                    itemCount: apps.length,
+                    itemBuilder: (context, index) {
+                      final app = apps[index];
+                      final topPad = math.max(14.0, viewportHeight * 0.05);
+                      final itemCenterY =
+                          (index * itemExtent) -
+                          _scrollOffset +
+                          topPad +
+                          (itemExtent / 2);
+
+                      final normalizedDist =
+                          ((itemCenterY - centerY) / (viewportHeight * 0.56))
+                              .clamp(-1.3, 1.3);
+                      final absDist = normalizedDist.abs();
+
+                      // Straight vertical stack by default (wheelCurvature == 0.0)
+                      final curveShift = store.wheelCurvature > 0.01
+                          ? (1.0 - math.cos(normalizedDist * math.pi * 0.42)) *
+                              68.0 *
+                              store.wheelCurvature
+                          : 0.0;
+                      final xIndent = 34.0 + curveShift;
+
+                      // Subtle kinetic focus scale & opacity
+                      final focusFactor =
+                          (1.0 - (absDist * 0.42)).clamp(0.0, 1.0);
+                      final scale = switch (store.animationPreset) {
+                        AnimationPreset.calmZen => 0.96 + (0.04 * focusFactor),
+                        AnimationPreset.liquidSpring =>
+                          0.92 + (0.11 * focusFactor),
+                        AnimationPreset.kineticHyper =>
+                          0.88 + (0.16 * focusFactor),
+                      };
+
+                      final opacity =
+                          (1.0 - math.pow(absDist, 2.2) * 0.45).clamp(0.35, 1.0);
+
+                      return AnimatedBuilder(
+                        animation: _entranceCtrl,
+                        builder: (context, child) {
+                          final delay = (index * 0.04).clamp(0.0, 0.65);
+                          final t = ((_entranceCtrl.value - delay) /
+                                  (1.0 - delay))
+                              .clamp(0.0, 1.0);
+                          final slideX =
+                              (1.0 - Curves.easeOutCubic.transform(t)) * -28.0;
+                          return Opacity(
+                            opacity: (opacity * t).clamp(0.0, 1.0),
+                            child: Transform.translate(
+                              offset: Offset(xIndent + slideX, 0),
+                              child: Transform.scale(
+                                alignment: Alignment.centerLeft,
+                                scale: scale,
+                                child: child,
+                              ),
+                            ),
+                          );
+                        },
+                        child: _AppRowItem(
+                          app: app,
+                          store: store,
+                          isFocused: absDist < 0.24,
+                          onTap: () =>
+                              _launchWithVaultCheck(context, store, app),
+                          onLongPress: () =>
+                              _showAppActions(context, store, app),
+                        ),
+                      );
+                    },
+                  ),
+
+                  // Ultra-minimalist A-Z Quick Scrubbing Rail on Right Edge
+                  if (letters.length > 4)
+                    Positioned(
+                      right: 6,
+                      top: 16,
+                      bottom: 24,
+                      child: GestureDetector(
+                        onVerticalDragUpdate: (details) {
+                          final box = context.findRenderObject() as RenderBox?;
+                          if (box == null) return;
+                          final localY = details.localPosition.dy;
+                          final totalH = viewportHeight - 40;
+                          final idx = ((localY / totalH) * letters.length)
+                              .floor()
+                              .clamp(0, letters.length - 1);
+                          _scrollToLetter(letters[idx], apps);
+                        },
+                        child: Container(
+                          width: 20,
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0E1D21)
+                                .withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: letters
+                                .take(18)
+                                .map(
+                                  (l) => GestureDetector(
+                                    onTap: () => _scrollToLetter(l, apps),
+                                    child: Text(
+                                      l,
+                                      style: TextStyle(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: fg.withValues(alpha: 0.65),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
         ),
       ],
     );
   }
 
-  List<Widget> _buildWheelItems({
-    required List<AppInfo> apps,
-    required double height,
-    required double width,
-    required double maxArchDepth,
-    required double curvature,
-    required bool leftSide,
-    required bool loopMode,
-    required LauncherStore store,
-  }) {
-    final count = apps.length;
-    final centerIdx = _scrollIndex.floor();
-    final items = <({double zOrder, Widget child})>[];
-
-    for (var offset = -_halfVisible - 1; offset <= _halfVisible + 1; offset++) {
-      final rawIdx = centerIdx + offset;
-      int actualIdx;
-      if (loopMode) {
-        actualIdx = ((rawIdx % count) + count) % count;
-      } else {
-        if (rawIdx < 0 || rawIdx >= count) continue;
-        actualIdx = rawIdx;
-      }
-
-      final relOffset = (rawIdx - _scrollIndex) / (_halfVisible + 0.65);
-      if (relOffset.abs() > 1.22) continue;
-
-      final pt = LauncherLogic.crescentPoint(
-        normOffset: relOffset,
-        height: height,
-        maxArchDepth: maxArchDepth,
-        curvature: curvature,
-        leftSide: leftSide,
-      );
-
-      final app = apps[actualIdx];
-      final isFocused = (rawIdx - _scrollIndex).abs() < 0.45;
-      final itemHeight = 56.0;
-      final top = (pt.dy - itemHeight * 0.5).clamp(-20.0, height - 26.0);
-      final maxItemWidth = width * 0.72;
-
-      // Subtle launch count or last used subtitle on the focused item
-      String? focusSub;
-      if (isFocused) {
-        final launches = store.launchCounts[app.package] ?? 0;
-        final sysMs = store.systemUsageMs[app.package] ?? 0;
-        if (sysMs > 60000) {
-          focusSub = 'Bugun: ${LauncherLogic.formatDurationUz(sysMs)}';
-        } else if (launches > 0) {
-          focusSub = '$launches marta ochilgan';
-        }
-      }
-
-      final tile = Opacity(
-        opacity: pt.opacity,
-        child: Transform.rotate(
-          angle: pt.angleRad,
-          alignment: leftSide ? Alignment.centerLeft : Alignment.centerRight,
-          child: Transform.scale(
-            scale: pt.scale,
-            alignment: leftSide ? Alignment.centerLeft : Alignment.centerRight,
-            child: SizedBox(
-              width: maxItemWidth,
-              height: itemHeight,
-              child: AppTile(
-                app: app,
-                isFavorite: store.isFavorite(app.package),
-                isFocused: isFocused,
-                alignRight: !leftSide,
-                iconSize: 44,
-                fontSize: 17.5,
-                customSubtitle: focusSub,
-                onTap: () {
-                  if (!isFocused && (rawIdx - _scrollIndex).abs() > 0.75) {
-                    // First tap on a distant arc item rotates it smoothly into focus;
-                    // or launches directly if fairly close.
-                    HapticFeedback.selectionClick();
-                    _coastController.animateTo(
-                      rawIdx.toDouble(),
-                      duration: const Duration(milliseconds: 260),
-                      curve: Curves.easeOutCubic,
-                    );
-                  } else {
-                    store.launch(app.package);
-                  }
-                },
-              ),
-            ),
-          ),
-        ),
-      );
-
-      final positioned = Positioned(
-        key: ValueKey('arc_${rawIdx}_${app.package}'),
-        top: top,
-        left: leftSide ? (18.0 + pt.dx) : null,
-        right: leftSide ? null : (18.0 - pt.dx),
-        child: tile,
-      );
-
-      items.add((zOrder: pt.scale, child: positioned));
+  Future<void> _launchWithVaultCheck(
+    BuildContext context,
+    LauncherStore store,
+    AppInfo app,
+  ) async {
+    HapticFeedback.mediumImpact();
+    if (store.isLocked(app.packageName)) {
+      final ok = await _promptVaultPin(context, store, app.name);
+      if (!ok) return;
     }
-
-    // Paint smaller background arc items first, and the large focal item on top
-    items.sort((a, b) => a.zOrder.compareTo(b.zOrder));
-    return items.map((e) => e.child).toList();
+    store.launchApp(app);
   }
 
-  Widget _buildFilterAndSearchBar(LauncherStore store) {
-    final isDark = store.isDark;
-    final pillBg = (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08);
-    final activeBg = widget.ink.withValues(alpha: isDark ? 0.22 : 0.16);
-
-    if (_searching) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-        child: Container(
-          height: 40,
-          decoration: BoxDecoration(
-            color: pillBg,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: widget.ink.withValues(alpha: 0.18)),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(
-            children: [
-              Icon(Icons.search_rounded, size: 18, color: widget.ink.withValues(alpha: 0.7)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: _searchCtrl,
-                  focusNode: _searchFocus,
-                  style: TextStyle(color: widget.ink, fontSize: 14.5, fontWeight: FontWeight.w500),
-                  decoration: InputDecoration(
-                    hintText: 'Yarim oyda ilova qidirish...',
-                    hintStyle: TextStyle(color: widget.ink.withValues(alpha: 0.45), fontSize: 13.5),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _searching = false;
-                    _searchCtrl.clear();
-                    _query = '';
-                  });
-                },
-                child: Icon(Icons.close_rounded, size: 18, color: widget.ink.withValues(alpha: 0.7)),
-              ),
-            ],
+  Future<bool> _promptVaultPin(
+    BuildContext context,
+    LauncherStore store,
+    String title,
+  ) async {
+    final pinCtrl = TextEditingController();
+    bool unlocked = false;
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0E1D21),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: BorderSide(
+            color: const Color(0xFF677E8A).withValues(alpha: 0.35),
           ),
         ),
-      );
-    }
+        title: Text(
+          '🔒 $title himoyalangan',
+          style: const TextStyle(
+            color: Color(0xFFABAFB5),
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: TextField(
+          controller: pinCtrl,
+          obscureText: true,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          style: const TextStyle(color: Color(0xFFABAFB5), letterSpacing: 6),
+          decoration: InputDecoration(
+            hintText: 'Maxfiy PIN kod (${store.vaultPin.length} xonali)',
+            hintStyle: const TextStyle(
+              color: Color(0xFF677E8A),
+              letterSpacing: 0,
+              fontSize: 12.5,
+            ),
+            filled: true,
+            fillColor: const Color(0xFF122E34),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text(
+              'Bekor qilish',
+              style: TextStyle(color: Color(0xFF677E8A)),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF677E8A),
+              foregroundColor: const Color(0xFF0E1D21),
+            ),
+            onPressed: () {
+              if (pinCtrl.text.trim() == store.vaultPin) {
+                unlocked = true;
+                Navigator.pop(ctx);
+              } else {
+                HapticFeedback.heavyImpact();
+              }
+            },
+            child: const Text('Ochish'),
+          ),
+        ],
+      ),
+    );
+    return unlocked;
+  }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        child: Row(
-          children: [
-            // Search icon pill
-            _actionPill(
-              icon: Icons.search_rounded,
-              tooltip: 'Qidiruv',
-              onTap: () {
-                HapticFeedback.selectionClick();
-                setState(() => _searching = true);
-                Future.delayed(const Duration(milliseconds: 80), () {
-                  if (mounted) _searchFocus.requestFocus();
-                });
-              },
-              bg: pillBg,
-            ),
-            const SizedBox(width: 6),
-            // Filter mode chips
-            for (final f in CrescentFilter.values)
-              Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: GestureDetector(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    store.setFilter(f);
-                    setState(() => _scrollIndex = 0.0);
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: store.activeFilter == f ? activeBg : pillBg,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: store.activeFilter == f
-                            ? widget.ink.withValues(alpha: 0.38)
-                            : Colors.transparent,
-                      ),
-                    ),
-                    child: Text(
-                      f.title,
-                      style: TextStyle(
-                        color: store.activeFilter == f
-                            ? widget.ink
-                            : widget.ink.withValues(alpha: 0.65),
-                        fontSize: 11.5,
-                        fontWeight: store.activeFilter == f ? FontWeight.w700 : FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            // Activity / Usage History Button
-            _actionPill(
-              icon: Icons.history_toggle_off_rounded,
-              label: 'Faollik',
-              onTap: () {
-                HapticFeedback.lightImpact();
-                widget.onOpenActivityLog();
-              },
-              bg: pillBg,
-            ),
-            const SizedBox(width: 6),
-            // Customize Studio Button
-            _actionPill(
-              icon: Icons.tune_rounded,
-              label: 'Bezatish',
-              onTap: () {
-                HapticFeedback.lightImpact();
-                widget.onOpenCustomize();
-              },
-              bg: pillBg,
-            ),
-          ],
+  Widget _buildCategoryChip({
+    required String label,
+    required bool selected,
+    required Color fg,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xFF122E34)
+              : const Color(0xFF0E1D21).withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected
+                ? const Color(0xFFABAFB5).withValues(alpha: 0.45)
+                : const Color(0xFF677E8A).withValues(alpha: 0.22),
+            width: 0.9,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: selected
+                ? const Color(0xFFABAFB5)
+                : const Color(0xFF677E8A),
+          ),
         ),
       ),
     );
   }
 
-  Widget _actionPill({
+  Widget _buildActionChip({
     required IconData icon,
-    String? label,
-    String? tooltip,
+    required String label,
     required VoidCallback onTap,
-    required Color bg,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: label != null ? 10 : 8, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(16),
+          color: const Color(0xFF0E1D21).withValues(alpha: 0.65),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: const Color(0xFF677E8A).withValues(alpha: 0.25),
+            width: 0.8,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 15, color: widget.ink.withValues(alpha: 0.8)),
-            if (label != null) ...[
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: widget.ink.withValues(alpha: 0.85),
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                ),
+            Icon(icon, size: 13, color: const Color(0xFFABAFB5)),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFFABAFB5),
               ),
-            ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMiniLetterRail(List<AppInfo> apps) {
-    const letters = ['A', 'C', 'F', 'I', 'M', 'P', 'S', 'T', 'Y'];
-    return GestureDetector(
-      onVerticalDragUpdate: (d) {
-        final box = context.findRenderObject() as RenderBox?;
-        if (box == null) return;
-        final frac = (d.localPosition.dy / (box.size.height * 0.75)).clamp(0.0, 1.0);
-        final targetIdx = (frac * (apps.length - 1)).round();
-        setState(() {
-          _scrollIndex = targetIdx.toDouble();
-          _checkHapticTick();
-        });
-      },
-      child: Container(
-        width: 18,
-        alignment: Alignment.center,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: letters.map((l) {
-            return GestureDetector(
-              onTap: () => _jumpToLetter(l, apps),
-              child: Text(
-                l,
-                style: TextStyle(
-                  color: widget.ink.withValues(alpha: 0.35),
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w700,
+  void _showAppActions(
+    BuildContext context,
+    LauncherStore store,
+    AppInfo app,
+  ) {
+    HapticFeedback.heavyImpact();
+    final isFav = store.isFavorite(app.packageName);
+    final isLocked = store.isLocked(app.packageName);
+    final isGame = store.isGameApp(app);
+    final count = store.launchCountOf(app.packageName);
+    final lastUsed = store.lastLaunchedOf(app.packageName);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(24, 14, 24, 28),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0E1D21),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border.all(
+              color: const Color(0xFF677E8A).withValues(alpha: 0.30),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF677E8A).withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
                 ),
               ),
-            );
-          }).toList(),
-        ),
-      ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _AppDiscIcon(app: app, store: store, isFocused: true),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          app.name,
+                          style: const TextStyle(
+                            color: Color(0xFFABAFB5),
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          '$count marta ochilgan${lastUsed != null ? " • ${lastUsed.hour.toString().padLeft(2, '0')}:${lastUsed.minute.toString().padLeft(2, '0')}" : ""}',
+                          style: const TextStyle(
+                            color: Color(0xFF677E8A),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const Divider(color: Color(0xFF122E34)),
+              ListTile(
+                dense: true,
+                leading: Icon(
+                  isFav ? Icons.star_rounded : Icons.star_border_rounded,
+                  color: const Color(0xFFE0B4B2),
+                ),
+                title: Text(
+                  isFav ? 'Asosiy ro\'yxatdan olish' : 'Asosiy ro\'yxatga qo\'shish',
+                  style: const TextStyle(color: Color(0xFFABAFB5)),
+                ),
+                onTap: () {
+                  store.toggleFavorite(app.packageName);
+                  Navigator.pop(ctx);
+                },
+              ),
+              ListTile(
+                dense: true,
+                leading: Icon(
+                  isGame
+                      ? Icons.sports_esports_rounded
+                      : Icons.videogame_asset_outlined,
+                  color: const Color(0xFF677E8A),
+                ),
+                title: Text(
+                  isGame ? 'Game Hubdan olib tashlash' : 'Game Hubga qo\'shish',
+                  style: const TextStyle(color: Color(0xFFABAFB5)),
+                ),
+                onTap: () {
+                  store.toggleGameApp(app.packageName);
+                  Navigator.pop(ctx);
+                },
+              ),
+              ListTile(
+                dense: true,
+                leading: Icon(
+                  isLocked ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
+                  color: const Color(0xFFABAFB5),
+                ),
+                title: Text(
+                  isLocked
+                      ? 'PIN qulfni olib tashlash'
+                      : 'Maxfiy PIN kod bilan qulflash',
+                  style: const TextStyle(color: Color(0xFFABAFB5)),
+                ),
+                onTap: () {
+                  store.toggleLockApp(app.packageName);
+                  Navigator.pop(ctx);
+                },
+              ),
+              ListTile(
+                dense: true,
+                leading: const Icon(
+                  Icons.visibility_off_outlined,
+                  color: Color(0xFF677E8A),
+                ),
+                title: const Text(
+                  'Ro\'yxatdan yashirish',
+                  style: TextStyle(color: Color(0xFFABAFB5)),
+                ),
+                onTap: () {
+                  store.toggleHidden(app.packageName);
+                  Navigator.pop(ctx);
+                },
+              ),
+              ListTile(
+                dense: true,
+                leading: const Icon(
+                  Icons.info_outline_rounded,
+                  color: Color(0xFFABAFB5),
+                ),
+                title: const Text(
+                  'Tizim sozlamalari (App Info)',
+                  style: TextStyle(color: Color(0xFFABAFB5)),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  store.openAppDetails(app.packageName);
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
+}
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
+class _AppRowItem extends StatelessWidget {
+  final AppInfo app;
+  final LauncherStore store;
+  final bool isFocused;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+
+  const _AppRowItem({
+    required this.app,
+    required this.store,
+    required this.isFocused,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = store.foregroundColor;
+    final count = store.launchCountOf(app.packageName);
+    final isLocked = store.isLocked(app.packageName);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.apps_outage_rounded, size: 36, color: widget.ink.withValues(alpha: 0.35)),
-          const SizedBox(height: 10),
-          Text(
-            'Ilova topilmadi',
-            style: TextStyle(color: widget.ink.withValues(alpha: 0.6), fontSize: 14),
+          _AppDiscIcon(app: app, store: store, isFocused: isFocused),
+          const SizedBox(width: 22),
+          Flexible(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    app.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: store.labelFontSize,
+                      fontWeight:
+                          isFocused ? FontWeight.w600 : FontWeight.w500,
+                      color: fg.withValues(alpha: isFocused ? 0.96 : 0.80),
+                      letterSpacing: 0.25,
+                    ),
+                  ),
+                ),
+                if (isLocked) ...[
+                  const SizedBox(width: 7),
+                  Icon(
+                    Icons.lock_rounded,
+                    size: 13,
+                    color: fg.withValues(alpha: 0.65),
+                  ),
+                ],
+                if (store.showUsageBadges && count > 0) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0E1D21).withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFABAFB5),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ),
@@ -540,87 +897,107 @@ class _CrescentWheelState extends State<CrescentWheel> with SingleTickerProvider
   }
 }
 
-/// Paints the subtle half-moon crescent guide curve and rotating tick marks.
-class _CrescentOrbitPainter extends CustomPainter {
-  final Color ink;
-  final double curvature;
-  final bool leftSide;
-  final double scrollPhase;
-  final double maxArchDepth;
+class _AppDiscIcon extends StatelessWidget {
+  final AppInfo app;
+  final LauncherStore store;
+  final bool isFocused;
 
-  _CrescentOrbitPainter({
-    required this.ink,
-    required this.curvature,
-    required this.leftSide,
-    required this.scrollPhase,
-    required this.maxArchDepth,
+  const _AppDiscIcon({
+    required this.app,
+    required this.store,
+    required this.isFocused,
   });
 
   @override
-  void paint(Canvas canvas, Size size) {
-    if (curvature < 0.05) return;
+  Widget build(BuildContext context) {
+    final size = store.iconDiscSize;
 
-    final path = Path();
-    const steps = 40;
-    for (var i = 0; i <= steps; i++) {
-      final norm = -1.05 + (2.10 * i / steps);
-      final pt = LauncherLogic.crescentPoint(
-        normOffset: norm,
-        height: size.height,
-        maxArchDepth: maxArchDepth,
-        curvature: curvature,
-        leftSide: leftSide,
-      );
-      final x = leftSide ? (40.0 + pt.dx) : (size.width - 40.0 + pt.dx);
-      final y = pt.dy;
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
+    final BorderRadius borderRadius = switch (store.iconStyle) {
+      IconPackStyle.monochromeDisc => BorderRadius.circular(size),
+      IconPackStyle.frostedGlass => BorderRadius.circular(size * 0.34),
+      IconPackStyle.outlineMinimal => BorderRadius.circular(size),
+      IconPackStyle.cyberHex => BorderRadius.circular(size * 0.24),
+    };
 
-    final arcPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          ink.withValues(alpha: 0.0),
-          ink.withValues(alpha: 0.18 * curvature),
-          ink.withValues(alpha: 0.32 * curvature),
-          ink.withValues(alpha: 0.18 * curvature),
-          ink.withValues(alpha: 0.0),
+    // Exact dark obsidian disc (#242829 / #0E1D21) like the user's screenshot
+    final Color bgColor = switch (store.iconStyle) {
+      IconPackStyle.monochromeDisc => const Color(0xFF232728),
+      IconPackStyle.frostedGlass =>
+        const Color(0xFF122E34).withValues(alpha: 0.82),
+      IconPackStyle.outlineMinimal =>
+        const Color(0xFF0E1D21).withValues(alpha: 0.45),
+      IconPackStyle.cyberHex => const Color(0xFF0E1D21),
+    };
+
+    final BoxBorder? border = switch (store.iconStyle) {
+      IconPackStyle.monochromeDisc => null,
+      IconPackStyle.frostedGlass => Border.all(
+        color: const Color(0xFFABAFB5).withValues(alpha: 0.25),
+        width: 1.0,
+      ),
+      IconPackStyle.outlineMinimal => Border.all(
+        color: store.foregroundColor.withValues(alpha: 0.50),
+        width: 1.4,
+      ),
+      IconPackStyle.cyberHex => Border.all(
+        color: isFocused
+            ? const Color(0xFFABAFB5)
+            : const Color(0xFF677E8A).withValues(alpha: 0.45),
+        width: 1.2,
+      ),
+    };
+
+    final glyphColor = store.iconStyle == IconPackStyle.outlineMinimal
+        ? store.foregroundColor.withValues(alpha: 0.85)
+        : const Color(0xFF677E8A).withValues(alpha: 0.72);
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: borderRadius,
+        border: border,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isFocused ? 0.26 : 0.14),
+            blurRadius: isFocused ? 12 : 6,
+            offset: const Offset(0, 3),
+          ),
         ],
-      ).createShader(Offset.zero & size);
-
-    canvas.drawPath(path, arcPaint);
-
-    // Draw subtle rotary tick dots along the crescent that move with scrollPhase
-    final frac = scrollPhase - scrollPhase.floor();
-    final tickPaint = Paint()..style = PaintingStyle.fill;
-    for (var k = -6; k <= 6; k++) {
-      final norm = (k - frac) / 5.5;
-      if (norm.abs() > 1.0) continue;
-      final pt = LauncherLogic.crescentPoint(
-        normOffset: norm,
-        height: size.height,
-        maxArchDepth: maxArchDepth,
-        curvature: curvature,
-        leftSide: leftSide,
-      );
-      final x = leftSide ? (14.0 + pt.dx * 0.82) : (size.width - 14.0 + pt.dx * 0.82);
-      final alpha = (1.0 - norm.abs()) * 0.35 * curvature;
-      tickPaint.color = ink.withValues(alpha: alpha);
-      canvas.drawCircle(Offset(x, pt.dy), k == 0 ? 3.2 : 1.5, tickPaint);
-    }
+      ),
+      alignment: Alignment.center,
+      child: _buildGlyph(size, glyphColor),
+    );
   }
 
-  @override
-  bool shouldRepaint(covariant _CrescentOrbitPainter old) =>
-      old.scrollPhase != scrollPhase ||
-      old.curvature != curvature ||
-      old.leftSide != leftSide ||
-      old.ink != ink;
+  Widget _buildGlyph(double size, Color glyphColor) {
+    if (app.iconBytes != null && app.iconBytes!.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(size * 0.26),
+        child: ColorFiltered(
+          colorFilter: ColorFilter.mode(
+            glyphColor.withValues(alpha: 0.78),
+            BlendMode.modulate,
+          ),
+          child: ColorFiltered(
+            colorFilter: const ColorFilter.matrix(<double>[
+              0.2126, 0.7152, 0.0722, 0, 0,
+              0.2126, 0.7152, 0.0722, 0, 0,
+              0.2126, 0.7152, 0.0722, 0, 0,
+              0,      0,      0,      1, 0,
+            ]),
+            child: Image.memory(
+              app.iconBytes!,
+              width: size * 0.50,
+              height: size * 0.50,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Icon(app.fallbackIcon, size: size * 0.46, color: glyphColor);
+  }
 }

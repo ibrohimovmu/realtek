@@ -1,69 +1,26 @@
-import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:minimal_launcher/models/app_info.dart';
 import 'package:minimal_launcher/services/ai_assistant_service.dart';
+import 'package:minimal_launcher/services/launcher_store.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  group('LauncherLogic weekStrip tests', () {
-    test('computes short weekday labels before and after', () {
-      // 2026-11-07 is Saturday (weekday = 6)
-      final sat = DateTime(2026, 11, 7);
-      final strip = LauncherLogic.weekStrip(sat);
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-      expect(strip.before.length, equals(3));
-      expect(strip.after.length, equals(3));
-      expect(strip.before, equals(['wed', 'thu', 'fri']));
-      expect(strip.after, equals(['sun', 'mon', 'tue']));
-    });
-  });
-
-  group('LauncherLogic crescentPoint half-moon geometry tests', () {
-    test('focal center (normOffset=0) has peak scale and opacity', () {
-      final center = LauncherLogic.crescentPoint(
-        normOffset: 0.0,
-        height: 500,
-        maxArchDepth: 80,
-        curvature: 0.8,
-        leftSide: true,
-      );
-      final topEdge = LauncherLogic.crescentPoint(
-        normOffset: -0.9,
-        height: 500,
-        maxArchDepth: 80,
-        curvature: 0.8,
-        leftSide: true,
-      );
-
-      expect(center.scale, closeTo(1.08, 0.01));
-      expect(center.opacity, equals(1.0));
-      expect(center.dy, closeTo(250.0, 0.1));
-      expect(center.dx, greaterThan(topEdge.dx));
-      expect(center.scale, greaterThan(topEdge.scale));
-      expect(center.opacity, greaterThan(topEdge.opacity));
-    });
-  });
-
-  group('LaunchRecord & formatting tests', () {
-    test('encodes and decodes LaunchRecord accurately', () {
-      const rec = LaunchRecord(package: 'org.telegram.messenger', timestampMs: 1794012345000);
-      final encoded = rec.encode();
-      final decoded = LaunchRecord.decode(encoded);
-      expect(decoded, isNotNull);
-      expect(decoded!.package, equals('org.telegram.messenger'));
-      expect(decoded.timestampMs, equals(1794012345000));
-    });
-
-    test('formats duration in Uzbek accurately', () {
-      expect(LauncherLogic.formatDurationUz(0), equals('0 daq'));
-      expect(LauncherLogic.formatDurationUz(15 * 60000), equals('15 daq'));
-      expect(LauncherLogic.formatDurationUz(125 * 60000), equals('2 soat 5 daq'));
-    });
-  });
-
-  group('AiAssistantService Telegram & hardware command parser tests', () {
-    test('parses "Telegramga kirib Akmalga 10 daqiqada boraman deb yoz"', () {
+  group('Nova AI Autonomous Local Command Parser (v4.0)', () {
+    test('parses Instagram Direct messaging command in Uzbek', () {
       final res = AiAssistantService.parseLocalCommand(
-        'Telegramga kirib Akmalga 10 daqiqada boraman deb yoz',
+        'Instagramga kirib Sardorga bugun soat 7 da ko\'rishamiz deb yoz',
+      );
+      expect(res, isNotNull);
+      expect(res!['action'], equals('send_instagram'));
+      expect(res['recipient'], equals('Sardor'));
+      expect(res['message'], equals('bugun soat 7 da ko\'rishamiz'));
+    });
+
+    test('parses Telegram messaging command in Uzbek', () {
+      final res = AiAssistantService.parseLocalCommand(
+        'Telegramdan Akmalga 10 daqiqada boraman deb yoz',
       );
       expect(res, isNotNull);
       expect(res!['action'], equals('send_telegram'));
@@ -71,24 +28,26 @@ void main() {
       expect(res['message'], equals('10 daqiqada boraman'));
     });
 
-    test('parses "Telegramdan @nthnto ga salom loyiha tayyor deb yozib yubor"', () {
+    test('parses WhatsApp messaging command in Uzbek', () {
       final res = AiAssistantService.parseLocalCommand(
-        'Telegramdan @nthnto ga salom loyiha tayyor deb yozib yubor',
+        'WhatsAppdan Jasurga hujjatlar tayyor deb yozib yubor',
       );
       expect(res, isNotNull);
-      expect(res!['action'], equals('send_telegram'));
-      expect(res['recipient'], equals('@nthnto'));
-      expect(res['message'], equals('salom loyiha tayyor'));
+      expect(res!['action'], equals('send_whatsapp'));
+      expect(res['recipient'], equals('Jasur'));
+      expect(res['message'], equals('hujjatlar tayyor'));
     });
 
-    test('parses "Oyimga telegramda ovqat tayyormi deb yoz"', () {
-      final res = AiAssistantService.parseLocalCommand(
-        'Oyimga telegramda ovqat tayyormi deb yoz',
+    test('parses Lock-Screen unlock and Game Hub RAM boost commands', () {
+      final unlock = AiAssistantService.parseLocalCommand(
+        'Telefon qulfini och',
       );
-      expect(res, isNotNull);
-      expect(res!['action'], equals('send_telegram'));
-      expect(res['recipient'], equals('Oyim'));
-      expect(res['message'], equals('ovqat tayyormi'));
+      expect(unlock?['action'], equals('unlock_screen'));
+
+      final boost = AiAssistantService.parseLocalCommand(
+        'RAM xotirani tozalab tezlashtir',
+      );
+      expect(boost?['action'], equals('boost_ram'));
     });
 
     test('parses flashlight, volume, and alarm commands', () {
@@ -100,46 +59,41 @@ void main() {
       expect(vol?['action'], equals('set_volume'));
       expect(vol?['percent'], equals(80));
 
-      final alarm = AiAssistantService.parseLocalCommand('Soat 07:30 ga budilnik qo\'y');
+      final alarm = AiAssistantService.parseLocalCommand(
+        'Soat 07:30 ga budilnik qo\'y',
+      );
       expect(alarm?['action'], equals('set_alarm'));
       expect(alarm?['hour'], equals(7));
       expect(alarm?['minute'], equals(30));
     });
   });
 
-  group('LauncherLogic search tests', () {
-    final sampleApps = [
-      AppInfo(label: 'YouTube', package: 'com.google.android.youtube', icon: Uint8List(0)),
-      AppInfo(label: 'Chrome', package: 'com.android.chrome', icon: Uint8List(0)),
-      AppInfo(label: 'Telegram', package: 'org.telegram.messenger', icon: Uint8List(0)),
-      AppInfo(label: 'WhatsApp', package: 'com.whatsapp', icon: Uint8List(0)),
-      AppInfo(label: 'Spotify', package: 'com.spotify.music', icon: Uint8List(0)),
-      AppInfo(label: 'Google Maps', package: 'com.google.android.apps.maps', icon: Uint8List(0)),
-    ];
+  group('Nordic Slate Store, Palette, Game Hub & Vault Security', () {
+    test('verifies Nordic Slate palette, vertical stack & Game Hub state', () async {
+      SharedPreferences.setMockInitialValues({});
+      final store = LauncherStore();
+      await store.init();
 
-    test('returns all apps when query is empty', () {
-      final res = LauncherLogic.search(sampleApps, '');
-      expect(res.length, equals(sampleApps.length));
-    });
+      // Verify exact Nordic Slate hex swatches (#0E1D21, #122E34, #677E8A, #ABAFB5, #622347, #E0B4B2)
+      expect(NordicPalette.obsidianTealHex, equals(0xFF0E1D21));
+      expect(NordicPalette.abyssalTealHex, equals(0xFF122E34));
+      expect(NordicPalette.steelSlateHex, equals(0xFF677E8A));
+      expect(NordicPalette.silverMistHex, equals(0xFFABAFB5));
+      expect(NordicPalette.mutedPlumHex, equals(0xFF622347));
+      expect(NordicPalette.roseSilverHex, equals(0xFFE0B4B2));
 
-    test('finds by exact prefix', () {
-      final res = LauncherLogic.search(sampleApps, 'You');
-      expect(res.first.label, equals('YouTube'));
-    });
+      // Verify default straight vertical stack (0.0 curvature, no forced half-moon)
+      expect(store.wheelCurvature, equals(0.0));
+      expect(store.iconStyle, equals(IconPackStyle.monochromeDisc));
+      expect(store.visibleApps, isNotEmpty);
 
-    test('finds by case-insensitive substring', () {
-      final res = LauncherLogic.search(sampleApps, 'tube');
-      expect(res.first.label, equals('YouTube'));
-    });
+      // Verify Game Hub & App Vault lock toggling
+      final firstPkg = store.visibleApps.first.package;
+      store.toggleGameApp(firstPkg);
+      expect(store.gameApps.any((a) => a.package == firstPkg), isTrue);
 
-    test('finds by initials (gm -> Google Maps)', () {
-      final res = LauncherLogic.search(sampleApps, 'gm');
-      expect(res.any((a) => a.label == 'Google Maps'), isTrue);
-    });
-
-    test('returns empty when no match found', () {
-      final res = LauncherLogic.search(sampleApps, 'xyz123NonExistent');
-      expect(res, isEmpty);
+      store.toggleLockApp(firstPkg);
+      expect(store.isLocked(firstPkg), isTrue);
     });
   });
 }

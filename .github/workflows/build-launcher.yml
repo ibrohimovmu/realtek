@@ -49,7 +49,7 @@ jobs:
       - name: Copy Universal APK
         run: |
           mkdir -p output_launcher_apks
-          cp minimal_launcher/build/app/outputs/flutter-apk/app-release.apk output_launcher_apks/MinimalLauncher-v3.0-Universal.apk
+          cp minimal_launcher/build/app/outputs/flutter-apk/app-release.apk output_launcher_apks/MinimalLauncher-v4.0-Universal.apk
 
       - name: Build Split per ABI APKs
         working-directory: minimal_launcher
@@ -57,14 +57,14 @@ jobs:
 
       - name: Copy Split APKs
         run: |
-          cp minimal_launcher/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk output_launcher_apks/MinimalLauncher-v3.0-arm64.apk || true
-          cp minimal_launcher/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk output_launcher_apks/MinimalLauncher-v3.0-armeabi.apk || true
+          cp minimal_launcher/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk output_launcher_apks/MinimalLauncher-v4.0-arm64.apk || true
+          cp minimal_launcher/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk output_launcher_apks/MinimalLauncher-v4.0-armeabi.apk || true
           ls -lh output_launcher_apks
 
       - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: MinimalLauncher-v3-APKs
+          name: MinimalLauncher-v4-APKs
           path: output_launcher_apks/*.apk
           retention-days: 14
 
@@ -72,23 +72,32 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: launcher-v3.0.0
-          name: "Minimal Launcher v3.0.0 (Nova AI Assistent + Telegram Ovozli Yozish + Bixby/Google Minimalist To'lqin)"
+          tag_name: launcher-v4.0.0
+          name: "Minimal Launcher v4.0.0 (Nordic Slate OS + Autonomous AI + Voice Biometrics + Game Hub + 6-Panel Kinetic Welcome)"
           body: |
-            ## ✨ Minimal Launcher v3.0.0 — Nova AI Assistent (Siri, Bixby va Google Assistant'dan ustun!)
+            ## ✨ Minimal Launcher v4.0.0 — Nordic Architectural OS & Autonomous AI
 
-            ### 🚀 Yangi AI Assistent Imkoniyatlari (v3.0.0):
-            - **💬 Telegramga Ovoz yoki Matn Bilan Xabar Yozish (`send_telegram`):**
-              - *"Telegramga kirib Akmalga 10 daqiqada boraman deb yoz"* yoki *"Telegramdan @nthnto ga salom loyiha tayyor deb yozib yubor"* desangiz:
-              - Telefon kontaktlaringizdan (`ContactsContract`) yoki saqlangan `@username` xotirasidan odamni avtomatik topadi, Telegram'da uning chatini ochib xabarni yozadi, va **Nova Avto-Yuborish (Accessibility)** yoqilgan bo'lsa **Send (`Yuborish`)** tugmasini ham o'zi bosib yuboradi!
-              - Bot obunachilari uchun esa fon rejimida (`Telegram Bot API`) ekranga tegmasdan ham xabar jo'natadi.
-            - **🌊 "Hi Bixby" / "Hey Google" / "Salom Nova" — Ultra-Minimalist Chaqiruv:**
-              - Bo'rtirib yuborilmagan, nafis minimalizm: ekran ostidan **60fps suyuq ipak nurlar to'lqini (`Edge Silk Wave`)** va ixcham **muzlatilgan oyna kapsulasi (`Floating Glass Capsule`)** silliq suzib chiqadi.
-              - Ovoz balandligiga qarab jonli harakatlanuvchi garmonik to'lqin va sukutni avtomatik sezish (`Auto-Silence VAD`).
-            - **🧠 Groq Whisper-v3-Turbo + GPT-OSS 120B / Qwen 3.8 + CoreAI UZ Quvvati:**
-              - O'zbek, rus va ingliz tillarida ovozni 99% aniqlikda tushunadi hamda tabiiy ovozda (`TTS`) javob qaytaradi.
-            - **📱 Qurilmani To'liq Boshqarish:**
-              - *"Fonarikni yoq / o'chir"*, *"Ovozni 80 foiz qil"*, *"Soat 07:30 ga budilnik qo'y"*, *"5 daqiqaga taymer qo'y"*, *"YouTube'dan ... qidir"*, *"Akmalga telefon qil"*, *"Orqa fonga ... chizib ber"*, *"Bugun qaysi ilovalarga ko'p kirdim?"*.
+            ### 🎨 1. Nordic Slate & Deep Petrol Ranglar Palitrasi (100% Siz Yuborgan Palitra)
+            - Robot yoki bachkana ranglardan butunlay voz kechildi: faqat **`#0E1D21`**, **`#122E34`**, **`#283E47`**, **`#677E8A`**, **`#ABAFB5`**, **`#622347`** va **`#E0B4B2`** me'moriy ranglar palitrasi ishlatildi.
+            - Yarim oy egriligi olib tashlanib, **tekis, nafis vertikal arxitektura ro'yxati**, silliq kengayuvchi qidiruv paneli (`Morphing Search`) va **Portal / Parda ilova ochilish animatsiyalari** o'rnatildi.
+            - Launcher yuklanganda oddiy zoom/fade emas, **6-panelli Kinetik Slate Welcome Parda animatsiyasi** bilan ochiladi.
+
+            ### 🤖 2. To'liq Avtonom Nova AI Assistent (Instagram, Telegram, WhatsApp, Voice Lock & Block Screen)
+            - **📸 Instagram, ✈️ Telegram va 💬 WhatsApp Avtonom Yozish (`Live Step-by-Step HUD`):**
+              - *"Instagramdan Sardor ga bugun ko'rishamiz deb yoz"* yoki *"Telegramdan Akmal ga 10 daqiqada boraman deb yoz"* desangiz, ekranning tepasida (`Live Agent HUD`) va pastki kapsulada har bir qadamni jonli ko'rsatib, ilovaga kiradi, do'stingizni qidiradi, xabarni yozadi va yuboradi.
+            - **🗣️ Shaxsiy Chaqirish Iborasi (`Custom Wake Phrase`):**
+              - Assistentni qanday chaqirishni o'zingiz belgilang (*"Hey Nova"*, *"Hey Jarvis"*, *"Salom Bro"* va h.k.).
+            - **🔐 Ovoz Biometriyasi (`Faqat Mening Ovozimga Ishlasin`):**
+              - 4-o'lchamli akustik spektral ovoz tahlili ($F_0$ pitch, ZCR, spektral energiya) orqali faqat sizning ovozingizni taniydi va begona ovozlarni bloklaydi.
+            - **🔓 Block Screen va Avtomatik PIN Ochish:**
+              - Qulflangan ekranda ham ishlaydi va sizning ovozingiz tasdiqlanganda PIN-kodni avtomatik terib telefon qulfini ochadi.
+
+            ### 🎮 3. Minimalist Game Hub va O'yin Usti (`In-Game Top Overlay`) Paneli
+            - Launcher ichida **Game Hub** konsoli va o'yinga kirganda ekranning eng tepasida chiqib turadigan **`🎮 Game Hub • °C • RAM %`** suzuvchi kapsulasi!
+            - Bosganda jonli **Harorat (`°C`)**, **RAM (`MB` va `%`)**, **Batareya (`%`)**, haqiqiy ishlovchi **`⚡ 1-Tap RAM Boost`** (`killBackgroundProcesses`) va **`🔕 Chalg'itmaslik (DND)`** chiqadi.
+
+            ### 🎵 4. Musiqa Pleyeri, Interaktiv Kalendar, Haqiqiy Unsplash Fotolari va Xavfsizlik
+            - Bosh ekranda jonli ekvalayzerli **Minimalist Musiqa Pleyeri**, **Oylik Interaktiv Kalendar**, **App Vault PIN qulfi**, va **Unsplash haqiqiy HD fotolar** kutubxonasi.
           files: output_launcher_apks/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
