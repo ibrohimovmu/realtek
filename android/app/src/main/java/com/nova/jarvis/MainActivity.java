@@ -194,6 +194,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 pageReady = true;
+                dispatchAccessibilityStatusToJs();
                 if (!hasMic()) {
                     requestMicPermission();
                 } else {
@@ -546,6 +547,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         super.onResume();
         activeInstance = this;
         notifyJsEvent("onAppResumed", "{}");
+        dispatchAccessibilityStatusToJs();
         if (pageReady && hasMic()) {
             startNativeListening(listeningLang);
         }
@@ -637,6 +639,39 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 return;
             }
             ActivityCompat.requestPermissions(this, needed.toArray(new String[0]), REQ_PHONE);
+        });
+    }
+
+    public boolean isAccessibilityEnabled() {
+        if (NovaAccessibilityService.getInstance() != null) return true;
+        try {
+            String enabled = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            return enabled != null && enabled.contains(getPackageName());
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    public void openAccessibilitySettings() {
+        runOnUiThread(() -> {
+            try {
+                Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
+            } catch (Throwable ignored) {}
+        });
+    }
+
+    public void dispatchAccessibilityStatusToJs() {
+        final boolean enabled = isAccessibilityEnabled();
+        notifyJsEvent("accessibility:status", "{\"enabled\":" + enabled + "}");
+        runOnUiThread(() -> {
+            if (webView != null) {
+                webView.evaluateJavascript(
+                        "if(typeof window.onAccessibilityStatus==='function'){window.onAccessibilityStatus(" + enabled + ");}",
+                        null
+                );
+            }
         });
     }
 

@@ -45,34 +45,33 @@ jobs:
 
       - name: Package APK Files
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk Nova-Overlay-v3.3.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk Nova-Overlay-v3.4.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk Nova-Jarvis.apk
 
-      - name: Upload Nova-Overlay-v3.3.apk Artifact
+      - name: Upload Nova-Overlay-v3.4.apk Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Nova-Overlay-v3.3-APK
+          name: Nova-Overlay-v3.4-APK
           path: |
-            Nova-Overlay-v3.3.apk
+            Nova-Overlay-v3.4.apk
             Nova-Jarvis.apk
           retention-days: 30
 
-      - name: Publish v3.3.0 to GitHub Releases
+      - name: Publish v3.4.0 to GitHub Releases
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: nova-overlay-v3.3.0
-          name: "NOVA v3.3.0 — Snappy Silence, Thin Cyber Rim, Human Speech & Telegram Plus Chat Navigation"
+          tag_name: nova-overlay-v3.4.0
+          name: "NOVA v3.4.0 — One-Tap Proactive Accessibility Prompt & Auto-Settings Opener"
           make_latest: true
           body: |
-            ## 🌌 NOVA v3.3.0 (`Nova-Overlay-v3.3.apk` / `Nova-Jarvis.apk`)
+            ## 🌌 NOVA v3.4.0 (`Nova-Overlay-v3.4.apk` / `Nova-Jarvis.apk`)
 
-            - ⚡ **Snappy Silence Detector:** Reduced delay from 3.2s to 1.4s (and 2.1s for trailing conjunctions "va", "keyin", "lekin"). Fast, responsive and never feels frozen!
-            - 💎 **Ultra-Thin Cyber Neon Edge Rim:** Replaced heavy inset shadow with an ultra-sleek 1.5px cyber neon border line with 4 corner brackets (Gemini Live style) and subtle luminous sheen.
-            - 🗣️ **Natural Human Speech & Digital Twin Persona:** High-quality voice selection, pitch 1.05 / speech rate 1.03 for lively, natural cadence, and conversational "bro / do'stim" responses.
-            - ✈️ **Telegram Plus Contact Auto-Navigation:** Now automatically handles commands like *"plusga kir Jamshidga yoz"* or *"Jamshidga salom deb yoz"* — opens Telegram Plus, taps search, types recipient name, and enters their chat!
+            - ⚡ **Proactive Accessibility Permission Prompts:** If Accessibility is not enabled, NOVA now displays an immediate, beautiful one-tap banner above the Orb to directly open Android's Accessibility Settings page.
+            - 🚀 **Zero-Confusion Auto-Navigator:** If you say *"plusga kir Jamshidga yoz"* before granting Accessibility, NOVA speaks aloud and opens the settings directly: *"Bro, Telegramda odamga avtomatik kirishim uchun Maxsus imkoniyatlar (Accessibility) ruxsatini yoqishing kerak, hozir ochyapman!"*.
+            - 🔄 **Auto-Resume & Detection:** As soon as you toggle on NOVA Accessibility and return to the app, the banner dismisses automatically with full automation unlocked.
           files: |
-            Nova-Overlay-v3.3.apk
+            Nova-Overlay-v3.4.apk
             Nova-Jarvis.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

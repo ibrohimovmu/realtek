@@ -8,8 +8,8 @@ android {
         applicationId "com.nova.jarvis"
         minSdkVersion 26
         targetSdkVersion 35
-        versionCode 35
-        versionName "3.3.0-SNAPPY-EDGE-PLUS"
+        versionCode 36
+        versionName "3.4.0-ACCESSIBILITY-PROMPT"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 

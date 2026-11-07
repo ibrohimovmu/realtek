@@ -116,6 +116,16 @@ public class NovaBridge {
     }
 
     @JavascriptInterface
+    public boolean isAccessibilityGranted() {
+        return activity.isAccessibilityEnabled();
+    }
+
+    @JavascriptInterface
+    public void requestAccessibilityPermission() {
+        activity.openAccessibilitySettings();
+    }
+
+    @JavascriptInterface
     public String getPermissionsStatus() {
         return getPermissionsStatusJson();
     }
@@ -314,6 +324,14 @@ public class NovaBridge {
         if (recipient == null || recipient.trim().isEmpty()) return false;
         String cleanRec = recipient.trim();
         String cleanMsg = message == null ? "" : message.trim();
+
+        // If Accessibility is NOT enabled, proactively alert user and open Settings screen
+        if (!cleanRec.startsWith("@") && !cleanRec.matches("^[+0-9]{7,15}$") && !activity.isAccessibilityEnabled()) {
+            activity.speakTextNative("Bro, Telegramda odamga avtomatik kirishim uchun Maxsus imkoniyatlar (Accessibility) ruxsatini yoqishing kerak, hozir ochyapman!");
+            activity.openAccessibilitySettings();
+            activity.dispatchAccessibilityStatusToJs();
+            return false;
+        }
 
         if (!cleanMsg.isEmpty() && NovaNotificationService.getInstance() != null) {
             if (NovaNotificationService.getInstance().sendInlineReply(cleanRec, cleanMsg)) {

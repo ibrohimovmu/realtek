@@ -132,6 +132,16 @@
         }, 350);
       });
 
+      window.onAccessibilityStatus = (enabled) => {
+        this.updateAccessibilityBanner(enabled);
+      };
+
+      window.NovaEvents.on('accessibility:status', (payload) => {
+        if (payload && typeof payload.enabled === 'boolean') {
+          this.updateAccessibilityBanner(payload.enabled);
+        }
+      });
+
       window.NovaEvents.on('onAppResumed', () => {
         this.refreshPermissionsUI();
       });
@@ -139,6 +149,19 @@
       window.NovaEvents.on('onPermissionsUpdated', () => {
         this.refreshPermissionsUI();
       });
+
+      const btnGrantAcc = document.getElementById('btn-grant-accessibility');
+      if (btnGrantAcc) {
+        btnGrantAcc.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const bridge = window.NovaBridge || window.NovaNative;
+          if (bridge && typeof bridge.requestAccessibilityPermission === 'function') {
+            bridge.requestAccessibilityPermission();
+          } else if (bridge && typeof bridge.openPermissionSettings === 'function') {
+            bridge.openPermissionSettings('accessibility');
+          }
+        });
+      }
     }
 
     startListening(keepCapsule = false) {
@@ -351,6 +374,14 @@
       if (tgMatchWithMsg && tgMatchWithMsg[1] && tgMatchWithMsg[2]) {
         const contact = tgMatchWithMsg[1].trim();
         const msg = tgMatchWithMsg[2].trim();
+        if (bridge && typeof bridge.isAccessibilityGranted === 'function' && !bridge.isAccessibilityGranted()) {
+          this.updateAccessibilityBanner(false);
+          bridge.requestAccessibilityPermission();
+          return {
+            reply: 'Bro, Telegramda odamga avtomatik kirishim uchun Maxsus imkoniyatlar (Accessibility) ruxsatini yoqishing kerak, hozir ochyapman!',
+            autoDismiss: false,
+          };
+        }
         try {
           if (bridge && typeof bridge.sendTelegramMessage === 'function') {
             bridge.sendTelegramMessage('org.telegram.plus', contact, msg);
@@ -368,6 +399,14 @@
       if (tgMatchOpenChat && tgMatchOpenChat[1]) {
         const contact = tgMatchOpenChat[1].trim();
         if (!['plus', 'telegram', 'ilova', 'dastur'].includes(contact)) {
+          if (bridge && typeof bridge.isAccessibilityGranted === 'function' && !bridge.isAccessibilityGranted()) {
+            this.updateAccessibilityBanner(false);
+            bridge.requestAccessibilityPermission();
+            return {
+              reply: 'Bro, Telegramda odamga avtomatik kirishim uchun Maxsus imkoniyatlar (Accessibility) ruxsatini yoqishing kerak, hozir ochyapman!',
+              autoDismiss: false,
+            };
+          }
           try {
             if (bridge && typeof bridge.sendTelegramMessage === 'function') {
               bridge.sendTelegramMessage('org.telegram.plus', contact, '');
@@ -587,6 +626,18 @@ Sening xaraktering va ovoz ohanging:
         btn.classList.toggle('granted', ok);
         btn.textContent = ok ? '✓ Yoqilgan' : 'Yoqish';
       });
+
+      this.updateAccessibilityBanner(!!status.accessibility);
+    }
+
+    updateAccessibilityBanner(enabled) {
+      const banner = document.getElementById('acc-perm-banner');
+      if (!banner) return;
+      if (enabled) {
+        banner.classList.add('hidden');
+      } else {
+        banner.classList.remove('hidden');
+      }
     }
 
     dismissOverlay() {
